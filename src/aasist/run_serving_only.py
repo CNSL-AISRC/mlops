@@ -46,6 +46,33 @@ def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weight
         # Create KFP client
         client = kfp.Client()
         
+        # Create or get experiment for multi-user mode
+        try:
+            experiment_name = "aasist-serving-experiments"
+            experiment = client.create_experiment(name=experiment_name)
+            experiment_id = experiment.experiment_id
+            print(f"✅ Created/found experiment: {experiment_name} (ID: {experiment_id})")
+        except Exception as e:
+            # Experiment might already exist, try to get it
+            try:
+                experiments = client.list_experiments()
+                experiment = None
+                for exp in experiments.experiments:
+                    if exp.display_name == experiment_name:
+                        experiment = exp
+                        break
+                
+                if experiment:
+                    experiment_id = experiment.experiment_id
+                    print(f"✅ Found existing experiment: {experiment_name} (ID: {experiment_id})")
+                else:
+                    # Use default experiment
+                    experiment_id = None
+                    print("⚠️  Using default experiment")
+            except Exception as e2:
+                experiment_id = None
+                print(f"⚠️  Could not create/find experiment, using default: {e2}")
+        
         # Compile pipeline
         print("🔧 Compiling serving pipeline...")
         kfp.compiler.Compiler().compile(
@@ -70,7 +97,8 @@ def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weight
                     'service_name': service_name
                 },
                 enable_caching=False,
-                run_name=simple_run_name
+                run_name=simple_run_name,
+                experiment_id=experiment_id
             )
         except Exception as e:
             print(f"⚠️  First attempt failed: {str(e)[:100]}...")
@@ -86,7 +114,8 @@ def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weight
                     'service_name': service_name
                 },
                 enable_caching=False,
-                run_name=simple_name
+                run_name=simple_name,
+                experiment_id=experiment_id
             )
         
         print(f"✅ Serving pipeline started successfully!")

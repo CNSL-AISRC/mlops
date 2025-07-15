@@ -72,6 +72,33 @@ def run_mlflow_pipeline(operation="upload_and_serve",
         # Create KFP client
         client = kfp.Client()
         
+        # Create or get experiment for multi-user mode
+        try:
+            experiment_name = "aasist-mlflow-experiments"
+            experiment = client.create_experiment(name=experiment_name)
+            experiment_id = experiment.experiment_id
+            print(f"✅ Created/found experiment: {experiment_name} (ID: {experiment_id})")
+        except Exception as e:
+            # Experiment might already exist, try to get it
+            try:
+                experiments = client.list_experiments()
+                experiment = None
+                for exp in experiments.experiments:
+                    if exp.display_name == experiment_name:
+                        experiment = exp
+                        break
+                
+                if experiment:
+                    experiment_id = experiment.experiment_id
+                    print(f"✅ Found existing experiment: {experiment_name} (ID: {experiment_id})")
+                else:
+                    # Use default experiment
+                    experiment_id = None
+                    print("⚠️  Using default experiment")
+            except Exception as e2:
+                experiment_id = None
+                print(f"⚠️  Could not create/find experiment, using default: {e2}")
+        
         # Compile pipeline
         print("🔧 Compiling pipeline...")
         kfp.compiler.Compiler().compile(
@@ -109,7 +136,8 @@ def run_mlflow_pipeline(operation="upload_and_serve",
                         'config_name': config_name
                     },
                     enable_caching=False,
-                    run_name=run_name
+                    run_name=run_name,
+                    experiment_id=experiment_id
                 )
                 print(f"✅ Success with run name: {run_name}")
                 break
@@ -139,7 +167,8 @@ def run_mlflow_pipeline(operation="upload_and_serve",
                                 'model_stage': model_stage,
                                 'config_name': config_name
                             },
-                            enable_caching=False
+                            enable_caching=False,
+                            experiment_id=experiment_id
                             # No run_name parameter - let Kubeflow generate it
                         )
                         print("✅ Success without explicit run name!")
