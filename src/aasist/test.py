@@ -12,7 +12,9 @@ from typing import Dict, Any, List
 
 # Service configuration
 SERVICE_BASE_URLS = [
-    "http://aasist-serving.kubeflow.svc.cluster.local:5000",  # Default service URL
+    "http://aasist-serving-direct.admin.svc.cluster.local:5000",  # KServe direct access
+    "http://aasist-serving.admin.svc.cluster.local:5000",  # KServe main service
+    "http://aasist-serving.kubeflow.svc.cluster.local:5000",  # Legacy URL
     "http://localhost:5000",  # Local development
     "http://127.0.0.1:5000",  # Alternative local
 ]
