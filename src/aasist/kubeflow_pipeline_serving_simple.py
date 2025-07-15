@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
 @component(
     base_image=BASE_IMAGE,
-    packages_to_install=["requests", "json"]
+    packages_to_install=["requests==2.31.0"]
 )
 def test_simple_service(
     service_info: dict,
@@ -217,59 +217,59 @@ def test_simple_service(
     os.makedirs(test_output, exist_ok=True)
     
     # Test cases
-    test_results = {{
+    test_results = {
         "service_name": service_info.get("service_name"),
         "test_timestamp": datetime.now().isoformat(),
         "tests": []
-    }}
+    }
     
     # Test 1: Health check (simulated)
     print("Testing health endpoint...")
-    health_test = {{
+    health_test = {
         "test_name": "health_check",
         "status": "simulated_pass",
         "response": {"status": "healthy", "service": service_info.get("service_name")},
         "response_time_ms": 45.2
-    }}
+    }
     test_results["tests"].append(health_test)
     
     # Test 2: Model info (simulated) 
     print("Testing info endpoint...")
-    info_test = {{
+    info_test = {
         "test_name": "model_info",
         "status": "simulated_pass",
-        "response": {{
+        "response": {
             "service_name": service_info.get("service_name"),
             "config_name": service_info.get("config_name"),
             "status": "active"
-        }},
+        },
         "response_time_ms": 32.1
-    }}
+    }
     test_results["tests"].append(info_test)
     
     # Test 3: Prediction (simulated)
     print("Testing prediction endpoint...")
-    pred_test = {{
+    pred_test = {
         "test_name": "prediction",
         "status": "simulated_pass", 
-        "response": {{
+        "response": {
             "prediction": "bonafide",
             "score": 0.73,
             "confidence": 0.46
-        }},
+        },
         "response_time_ms": 125.8
-    }}
+    }
     test_results["tests"].append(pred_test)
     
     # Calculate summary
     total_tests = len(test_results["tests"])
     passed_tests = sum(1 for t in test_results["tests"] if "pass" in t["status"])
-    test_results["summary"] = {{
+    test_results["summary"] = {
         "total_tests": total_tests,
         "passed_tests": passed_tests,
         "success_rate": f"{passed_tests}/{total_tests}",
         "overall_status": "pass" if passed_tests == total_tests else "fail"
-    }}
+    }
     
     # Save results
     results_file = os.path.join(test_output, "test_results.json")
