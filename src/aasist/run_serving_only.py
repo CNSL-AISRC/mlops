@@ -41,7 +41,7 @@ def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weight
     print("🚀 Running AASIST Serving-Only Pipeline...")
     
     try:
-        from kubeflow_pipeline_serving import aasist_serving_pipeline
+        from kubeflow_pipeline_serving_simple import aasist_simple_serving_pipeline
         
         # Create KFP client
         client = kfp.Client()
@@ -49,8 +49,8 @@ def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weight
         # Compile pipeline
         print("🔧 Compiling serving pipeline...")
         kfp.compiler.Compiler().compile(
-            aasist_serving_pipeline, 
-            'aasist_serving.yaml'
+            aasist_simple_serving_pipeline, 
+            'aasist_simple_serving.yaml'
         )
         print("✅ Serving pipeline compiled successfully!")
         
@@ -63,11 +63,11 @@ def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weight
         
         try:
             run = client.create_run_from_pipeline_func(
-                aasist_serving_pipeline, 
+                aasist_simple_serving_pipeline, 
                 arguments={
-                    'model_name': service_name,
+                    'model_path': model_path,
                     'config_name': config_name,
-                    'model_path': model_path
+                    'service_name': service_name
                 },
                 enable_caching=False,
                 run_name=simple_run_name
@@ -79,11 +79,11 @@ def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weight
             # Fallback with even simpler name
             simple_name = f"serve{timestamp[-6:]}"
             run = client.create_run_from_pipeline_func(
-                aasist_serving_pipeline, 
+                aasist_simple_serving_pipeline, 
                 arguments={
-                    'model_name': service_name,
+                    'model_path': model_path,
                     'config_name': config_name,
-                    'model_path': model_path
+                    'service_name': service_name
                 },
                 enable_caching=False,
                 run_name=simple_name

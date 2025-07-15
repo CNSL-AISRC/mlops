@@ -486,6 +486,8 @@ def test_inference_service(
 
 @pipeline(name='aasist-serving')
 def aasist_serving_pipeline(
+    model_path: str = "/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
+    config_name: str = "AASIST",
     model_name: str = "aasist_demo_model",
     service_name: str = "aasist-serving",
     namespace: str = "default",
@@ -496,6 +498,8 @@ def aasist_serving_pipeline(
     Deploy and test AASIST models for inference
     
     Args:
+        model_path: Path to the trained model file
+        config_name: Model configuration (AASIST, AASIST-L)
         model_name: Name of the model to serve
         service_name: Name of the inference service
         namespace: Kubernetes namespace for deployment
