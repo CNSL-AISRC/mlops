@@ -31,73 +31,42 @@ def download_demo_dataset(
     dataset_url: str,
     dataset_path: OutputPath('Dataset')
 ) -> str:
-    """Download and prepare a small subset of ASVspoof2019 dataset for demo"""
+    """Download and prepare ASVspoof2019 dataset"""
     import os
     import requests
     import zipfile
     from pathlib import Path
     
-    print(f"Downloading demo dataset from {dataset_url}")
+    print(f"Downloading dataset from {dataset_url}")
     
     # Create dataset directory
     os.makedirs(dataset_path, exist_ok=True)
     
-    # For demo, we can use a smaller subset or mock the dataset
-    if "asvspoof" in dataset_url.lower():
-        # Download the full dataset but we'll only use a subset for evaluation
-        print("Downloading ASVspoof2019 dataset...")
-        response = requests.get(dataset_url, stream=True)
-        response.raise_for_status()
-        
-        zip_path = os.path.join(dataset_path, "LA.zip")
-        with open(zip_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        
-        # Extract dataset
-        print("Extracting dataset...")
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(dataset_path)
-        
-        # Remove zip file to save space
-        os.remove(zip_path)
-        
-        # Verify dataset structure
-        la_path = os.path.join(dataset_path, "LA")
-        if os.path.exists(la_path):
-            print(f"Dataset successfully prepared at {dataset_path}")
-            return f"Full dataset prepared with {len(os.listdir(la_path))} items"
-        else:
-            raise ValueError(f"Expected LA directory not found in {dataset_path}")
+    # Download the dataset
+    print("Downloading ASVspoof2019 dataset...")
+    response = requests.get(dataset_url, stream=True)
+    response.raise_for_status()
+    
+    zip_path = os.path.join(dataset_path, "LA.zip")
+    with open(zip_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+    
+    # Extract dataset
+    print("Extracting dataset...")
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(dataset_path)
+    
+    # Remove zip file to save space
+    os.remove(zip_path)
+    
+    # Verify dataset structure
+    la_path = os.path.join(dataset_path, "LA")
+    if os.path.exists(la_path):
+        print(f"Dataset successfully prepared at {dataset_path}")
+        return f"Dataset prepared with {len(os.listdir(la_path))} items"
     else:
-        # For demo with mock data
-        print("Creating mock dataset for demo...")
-        mock_la_path = os.path.join(dataset_path, "LA")
-        os.makedirs(mock_la_path, exist_ok=True)
-        
-        # Create mock directory structure
-        for split in ["train", "dev", "eval"]:
-            split_dir = os.path.join(mock_la_path, f"ASVspoof2019_LA_{split}")
-            os.makedirs(split_dir, exist_ok=True)
-            
-            # Create a few mock audio files
-            for i in range(10):
-                mock_file = os.path.join(split_dir, f"LA_T_{i:07d}.flac")
-                with open(mock_file, 'w') as f:
-                    f.write("mock_audio_data")
-        
-        # Create mock protocol files
-        protocol_dir = os.path.join(mock_la_path, "ASVspoof2019_LA_cm_protocols")
-        os.makedirs(protocol_dir, exist_ok=True)
-        
-        for split in ["trn", "dev", "eval"]:
-            protocol_file = os.path.join(protocol_dir, f"ASVspoof2019.LA.cm.{split}.trl.txt")
-            with open(protocol_file, 'w') as f:
-                for i in range(10):
-                    f.write(f"LA LA_T_{i:07d} - A01 bonafide\n")
-        
-        print(f"Mock dataset created at {dataset_path}")
-        return "Mock dataset created for demo"
+        raise ValueError(f"Expected LA directory not found in {dataset_path}")
 
 @component(
     base_image=BASE_IMAGE,
@@ -924,17 +893,17 @@ def upload_demo_model_to_mlflow(
 
 @pipeline(name='aasist-demo')
 def aasist_demo_pipeline(
-    dataset_url: str = "mock://demo_dataset",  # Use mock for faster demo
+    dataset_url: str = "http://10.5.110.131:8080/LA.zip",  # Real dataset
     config_name: str = "AASIST",
     model_name: str = "aasist_demo_model",
     include_serving: bool = True,  # Include serving endpoint
-    include_mlflow_upload: bool = True  # New: Upload to MLflow Registry
+    include_mlflow_upload: bool = True  # Upload to MLflow Registry
 ):
     """
     AASIST Demo Pipeline - Complete MLOps demonstration
     
     Args:
-        dataset_url: URL for dataset (use 'mock://demo_dataset' for quick demo)
+        dataset_url: URL for dataset
         config_name: Model configuration (AASIST or AASIST-L)  
         model_name: Name for MLflow model registration
         include_serving: Whether to deploy demo serving endpoint
@@ -1006,7 +975,7 @@ if __name__ == "__main__":
     print("\n📋 Quick Start:")
     print("1. Upload 'aasist_demo_pipeline.yaml' to Kubeflow")
     print("2. Create a new run with parameters:")
-    print("   - dataset_url: 'mock://demo_dataset' (for quick demo)")
+    print("   - dataset_url: Real dataset URL")
     print("   - config_name: 'AASIST' or 'AASIST-L'")
     print("   - model_name: 'your_model_name'")
     print("   - include_serving: true (to deploy demo API)")

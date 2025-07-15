@@ -52,7 +52,7 @@ def check_environment():
         print("✅ Environment looks good!")
         return True
 
-def run_demo_pipeline(dataset_url="mock://demo_dataset", 
+def run_demo_pipeline(dataset_url="http://10.5.110.131:8080/LA.zip", 
                      config_name="AASIST", 
                      model_name="aasist_demo"):
     """Run the demo pipeline using KFP client"""
@@ -130,27 +130,25 @@ def show_demo_info():
     print("="*60)
     
     print("\n📋 What this demo includes:")
-    print("  ✓ Mock dataset creation (fast, no large downloads)")
-    print("  ✓ Pretrained model loading simulation")
-    print("  ✓ Evaluation with realistic metrics")
+    print("  ✓ Real dataset download and preparation")
+    print("  ✓ AASIST model training/evaluation")
     print("  ✓ MLflow integration and logging")
-    print("  ✓ HTTP serving API with health checks")
+    print("  ✓ HTTP serving API deployment")
     print("  ✓ Comprehensive reporting")
     
-    print("\n⚡ Expected runtime: 3-5 minutes")
-    print("💾 Resource requirements: Minimal (CPU only)")
+    print("\n⚡ Expected runtime: 10-15 minutes")
+    print("💾 Resource requirements: CPU/GPU recommended")
     
     print("\n📊 Pipeline steps:")
-    print("  1️⃣  Dataset Preparation (mock data)")
-    print("  2️⃣  Pretrained Model Loading")
-    print("  3️⃣  Model Evaluation (simulated)")
-    print("  4️⃣  MLflow Logging & Model Upload")
-    print("  5️⃣  HTTP Serving Deployment")
-    print("  6️⃣  Service Testing & Validation")
-    print("  7️⃣  Report Generation")
+    print("  1️⃣  Dataset Download & Preparation")
+    print("  2️⃣  Model Training/Evaluation")
+    print("  3️⃣  MLflow Logging & Model Upload")
+    print("  4️⃣  HTTP Serving Deployment")
+    print("  5️⃣  Service Testing & Validation")
+    print("  6️⃣  Report Generation")
     
     print("\n🔧 Configuration options:")
-    print("  • dataset_url: 'mock://demo_dataset' (demo) or real URL")
+    print("  • dataset_url: Real dataset URL")
     print("  • config_name: 'AASIST' or 'AASIST-L'") 
     print("  • model_name: Name for MLflow model registry")
 
@@ -160,7 +158,7 @@ def show_usage_examples():
     
     print("\n🔧 Example 1: Default Demo")
     print("  python run_demo.py")
-    print("  # Runs with mock data and AASIST config")
+    print("  # Uses real LA dataset with AASIST config")
     
     print("\n🔧 Example 2: Different Config")
     print("  python run_demo.py --config AASIST-L --model_name my_large_model")
@@ -173,8 +171,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="AASIST Demo Pipeline Runner")
-    parser.add_argument("--dataset_url", default="mock://demo_dataset",
-                       help="Dataset URL (use 'mock://demo_dataset' for demo)")
+    parser.add_argument("--dataset_url", default="http://10.5.110.131:8080/LA.zip",
+                       help="Dataset URL")
     parser.add_argument("--config", dest="config_name", default="AASIST",
                        choices=["AASIST", "AASIST-L"],
                        help="Model configuration")
