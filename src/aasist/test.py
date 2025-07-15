@@ -12,11 +12,19 @@ from typing import Dict, Any, List
 
 # Service configuration
 SERVICE_BASE_URLS = [
-    "http://aasist-serving-direct.admin.svc.cluster.local:5000",  # KServe direct access
-    "http://aasist-serving.admin.svc.cluster.local:5000",  # KServe main service
-    "http://aasist-serving.kubeflow.svc.cluster.local:5000",  # Legacy URL
-    "http://localhost:5000",  # Local development
-    "http://127.0.0.1:5000",  # Alternative local
+    # Real AASIST KServe URLs (from kubeflow_pipeline_real.py)
+    "http://aasist-real.admin.svc.cluster.local/v1/models/aasist-real-model:predict",  # Real KServe v1 endpoint
+    "http://aasist-real-predictor-default.admin.svc.cluster.local",  # Real KServe predictor
+    "http://aasist-real.admin.svc.cluster.local",  # Real base KServe URL
+    # Minimal AASIST KServe URLs (from kubeflow_pipeline_minimal.py)
+    "http://aasist-minimal.admin.svc.cluster.local/v1/models/aasist-model:predict",  # Minimal KServe v1 endpoint
+    "http://aasist-minimal-predictor-default.admin.svc.cluster.local",  # Minimal KServe predictor
+    "http://aasist-minimal.admin.svc.cluster.local",  # Minimal base KServe URL
+    # Legacy URLs from other pipelines
+    "http://aasist-serving-direct.admin.svc.cluster.local:5000",  # Direct access
+    "http://aasist-serving.admin.svc.cluster.local:5000",  # Main service
+    "http://localhost:8080",  # Local KServe default port
+    "http://127.0.0.1:8080",  # Alternative local
 ]
 
 def generate_mock_audio_data(duration_seconds: float = 1.0, sample_rate: int = 16000) -> List[float]:
