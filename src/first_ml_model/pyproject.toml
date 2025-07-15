@@ -1,0 +1,12 @@
+[project]
+name = "first-ml-model"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "kfp==2.5.0",
+    "kserve==0.13.1",
+    "mlflow==2.15.1",
+    "tenacity>=9.1.2",
+]

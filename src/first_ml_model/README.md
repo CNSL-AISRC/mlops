@@ -1,0 +1,1 @@
+Follow https://charmed-kubeflow.io/docs/build-your-first-ml-model

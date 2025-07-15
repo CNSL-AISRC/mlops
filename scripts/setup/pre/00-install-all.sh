@@ -8,3 +8,8 @@
 ## run 02-install-docker.sh
 ./02-install-docker.sh
 
+## run 03-install-k8s.sh
+./03-install-k8s.sh
+
+## run 04-install-juju.sh
+./04-install-juju.sh
