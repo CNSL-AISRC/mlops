@@ -34,7 +34,7 @@ def check_environment():
         print("✅ Environment looks good!")
         return True
 
-def run_serving_pipeline(model_path="https://huggingface.co/sasuke/AASIST/resolve/main/weights/AASIST.pth",
+def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
                         config_name="AASIST", 
                         service_name="aasist-serving"):
     """Run the serving-only pipeline using KFP client"""
@@ -111,7 +111,7 @@ def show_serving_info():
     print("="*60)
     
     print("\n📋 What this pipeline does:")
-    print("  ✓ Downloads pretrained AASIST model")
+    print("  ✓ Loads your trained AASIST model")
     print("  ✓ Deploys HTTP serving API")
     print("  ✓ No dataset download or training")
     print("  ✓ Quick deployment for inference")
@@ -120,12 +120,12 @@ def show_serving_info():
     print("💾 Resource requirements: Minimal (CPU only)")
     
     print("\n📊 Pipeline steps:")
-    print("  1️⃣  Download Model")
+    print("  1️⃣  Load Model")
     print("  2️⃣  Deploy Serving API")
     print("  3️⃣  Test API Endpoints")
     
     print("\n🔧 Configuration options:")
-    print("  • model_path: URL/path to pretrained model")
+    print("  • model_path: Path to your trained model")
     print("  • config_name: 'AASIST' or 'AASIST-L'") 
     print("  • service_name: Name for the serving service")
 
@@ -133,9 +133,9 @@ def show_usage_examples():
     """Show usage examples"""
     print("\n📚 Usage Examples:")
     
-    print("\n🔧 Example 1: Default (HuggingFace model)")
+    print("\n🔧 Example 1: Default (Local model)")
     print("  python run_serving_only.py")
-    print("  # Uses pretrained model from HuggingFace")
+    print("  # Uses local trained model")
     
     print("\n🔧 Example 2: Custom Model")
     print("  python run_serving_only.py --model_path /path/to/model.pth --service_name my-model")
@@ -149,8 +149,8 @@ def main():
     
     parser = argparse.ArgumentParser(description="AASIST Serving-Only Pipeline Runner")
     parser.add_argument("--model_path", 
-                       default="https://huggingface.co/sasuke/AASIST/resolve/main/weights/AASIST.pth",
-                       help="Path or URL to pretrained model")
+                       default="/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
+                       help="Path to local model file")
     parser.add_argument("--config", dest="config_name", default="AASIST",
                        choices=["AASIST", "AASIST-L"],
                        help="Model configuration")

@@ -58,7 +58,7 @@ def check_environment():
         return True
 
 def run_mlflow_pipeline(operation="upload_and_serve", 
-                       model_path="https://huggingface.co/sasuke/AASIST/resolve/main/weights/AASIST.pth",
+                       model_path="/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
                        model_name="aasist_production",
                        model_version="1.0",
                        model_stage="Production",
@@ -144,7 +144,7 @@ def show_usage_examples():
     
     print("\n🔧 Example 1: Upload and Serve (Default)")
     print("  python run_mlflow_serving.py")
-    print("  # Uses default HuggingFace model and serves it")
+    print("  # Uses local trained model and serves it")
     
     print("\n🔧 Example 2: Upload Only")
     print("  python run_mlflow_serving.py --operation upload_only --model_path /path/to/model.pth")
@@ -168,8 +168,8 @@ def main():
                        choices=["upload_only", "serve_only", "upload_and_serve"],
                        help="Operation mode")
     parser.add_argument("--model_path", 
-                       default="https://huggingface.co/sasuke/AASIST/resolve/main/weights/AASIST.pth",
-                       help="Path or URL to model file")
+                       default="/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
+                       help="Path to local model file")
     parser.add_argument("--model_name", default="aasist_production",
                        help="MLflow model name")
     parser.add_argument("--model_version", default="1.0",

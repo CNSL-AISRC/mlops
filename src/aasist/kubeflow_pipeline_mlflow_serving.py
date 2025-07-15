@@ -669,7 +669,7 @@ and provides production-ready inference capabilities.
 
 @pipeline(name='aasist-mlflow')
 def aasist_mlflow_serving_pipeline(
-    model_path: str = "path/to/your/model.pth",
+    model_path: str = "/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
     model_name: str = "aasist_production_model",
     model_version: str = "1.0",
     model_stage: str = "Production",
