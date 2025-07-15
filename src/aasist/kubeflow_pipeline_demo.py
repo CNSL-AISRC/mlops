@@ -838,21 +838,107 @@ For production use, replace with actual AASIST model inference.
     
     return serving_config
 
+@component(
+    base_image=BASE_IMAGE,
+    packages_to_install=DEMO_PACKAGES + ["mlflow==2.15.1"]
+)
+def upload_demo_model_to_mlflow(
+    model: InputPath('Model'),
+    evaluation: InputPath('Evaluation'),
+    model_name: str,
+    config_name: str
+) -> dict:
+    """Upload demo model to MLflow Model Registry"""
+    import os
+    import json
+    import mlflow
+    from pathlib import Path
+    
+    print(f"Uploading demo model to MLflow: {model_name}")
+    
+    # Setup MLflow
+    mlflow.set_experiment("aasist-demo-models")
+    
+    with mlflow.start_run(run_name=f"demo_{model_name}") as run:
+        # Load evaluation results
+        eval_results_file = os.path.join(evaluation, "evaluation_results.json")
+        if os.path.exists(eval_results_file):
+            with open(eval_results_file, 'r') as f:
+                eval_results = json.load(f)
+        else:
+            eval_results = {"EER_percent": 1.0, "min_tDCF": 0.05}
+        
+        # Log model parameters
+        mlflow.log_param("model_name", model_name)
+        mlflow.log_param("config_name", config_name)
+        mlflow.log_param("model_type", "demo_pretrained")
+        mlflow.log_param("demo_mode", True)
+        
+        # Log evaluation metrics
+        if "EER_percent" in eval_results:
+            mlflow.log_metric("EER_percent", eval_results["EER_percent"])
+        if "min_tDCF" in eval_results:
+            mlflow.log_metric("min_tDCF", eval_results["min_tDCF"])
+        
+        # Log model artifacts
+        mlflow.log_artifacts(model, "model")
+        mlflow.log_artifacts(evaluation, "evaluation")
+        
+        # Register model in MLflow Model Registry
+        model_uri = f"runs:/{run.info.run_id}/model"
+        
+        try:
+            registered_model = mlflow.register_model(
+                model_uri=model_uri,
+                name=model_name,
+                tags={
+                    "config": config_name,
+                    "type": "demo",
+                    "EER": str(eval_results.get("EER_percent", 1.0)),
+                    "min_tDCF": str(eval_results.get("min_tDCF", 0.05))
+                }
+            )
+            
+            print(f"✅ Demo model registered in MLflow!")
+            print(f"   Name: {registered_model.name}")
+            print(f"   Version: {registered_model.version}")
+            
+            return {
+                "status": "success",
+                "model_name": model_name,
+                "model_version": registered_model.version,
+                "model_uri": model_uri,
+                "registry_uri": f"models:/{model_name}/{registered_model.version}",
+                "run_id": run.info.run_id,
+                "performance": eval_results
+            }
+            
+        except Exception as e:
+            print(f"❌ Failed to register model: {e}")
+            return {
+                "status": "failed",
+                "error": str(e),
+                "model_uri": model_uri,
+                "run_id": run.info.run_id
+            }
+
 @pipeline(name='aasist-demo-pipeline')
 def aasist_demo_pipeline(
     dataset_url: str = "mock://demo_dataset",  # Use mock for faster demo
     config_name: str = "AASIST",
     model_name: str = "aasist_demo_model",
-    include_serving: bool = True  # New parameter to include serving
+    include_serving: bool = True,  # Include serving endpoint
+    include_mlflow_upload: bool = True  # New: Upload to MLflow Registry
 ):
     """
-    AASIST Demo Pipeline - Simplified for demonstration
+    AASIST Demo Pipeline - Complete MLOps demonstration
     
     Args:
         dataset_url: URL for dataset (use 'mock://demo_dataset' for quick demo)
         config_name: Model configuration (AASIST or AASIST-L)  
         model_name: Name for MLflow model registration
         include_serving: Whether to deploy demo serving endpoint
+        include_mlflow_upload: Whether to upload model to MLflow Model Registry
     """
     
     # Step 1: Download and prepare dataset
@@ -868,7 +954,7 @@ def aasist_demo_pipeline(
         config_name=config_name
     )
     
-    # Step 4: Log to MLflow
+    # Step 4: Log to MLflow (basic logging)
     mlflow_task = log_model_to_mlflow_demo(
         model=model_task.outputs['model_output'],
         evaluation=eval_task.outputs['evaluation_output'],
@@ -876,7 +962,17 @@ def aasist_demo_pipeline(
         model_name=model_name
     )
     
-    # Step 5: Deploy serving endpoint (optional)
+    # Step 5: Upload to MLflow Model Registry (optional)
+    if include_mlflow_upload:
+        registry_task = upload_demo_model_to_mlflow(
+            model=model_task.outputs['model_output'],
+            evaluation=eval_task.outputs['evaluation_output'],
+            model_name=model_name,
+            config_name=config_name
+        )
+        registry_task.set_memory_limit("2Gi").set_cpu_limit("1")
+    
+    # Step 6: Deploy serving endpoint (optional)
     if include_serving:
         serving_task = deploy_model_demo_serving(
             model=model_task.outputs['model_output'],
@@ -885,7 +981,7 @@ def aasist_demo_pipeline(
         )
         serving_task.set_memory_limit("2Gi").set_cpu_limit("1")
     
-    # Step 6: Generate comprehensive demo report
+    # Step 7: Generate comprehensive demo report
     report_task = generate_demo_report(
         evaluation=eval_task.outputs['evaluation_output'],
         mlflow_info=mlflow_task.output,
@@ -914,13 +1010,15 @@ if __name__ == "__main__":
     print("   - config_name: 'AASIST' or 'AASIST-L'")
     print("   - model_name: 'your_model_name'")
     print("   - include_serving: true (to deploy demo API)")
-    print("\n⚡ Expected runtime: 3-7 minutes")
+    print("   - include_mlflow_upload: true (to register in MLflow)")
+    print("\n⚡ Expected runtime: 4-8 minutes")
     print("🔧 Resources needed: Minimal (no GPU required for demo)")
-    print("\n📊 Complete Pipeline includes:")
+    print("\n📊 Complete MLOps Pipeline includes:")
     print("   ✓ Demo dataset preparation")
     print("   ✓ Pretrained model loading") 
     print("   ✓ Model evaluation (simulated)")
     print("   ✓ MLflow experiment tracking")
+    print("   ✓ MLflow Model Registry upload")
     print("   ✓ HTTP serving API deployment")
     print("   ✓ API testing and validation")
     print("   ✓ Comprehensive reporting")
@@ -932,7 +1030,14 @@ if __name__ == "__main__":
     print("   • Model performance metrics")
     print("   • Example client code")
     
-    print("\n🔗 For production serving:")
-    print("   • Use kubeflow_pipeline_serving.py")
-    print("   • Deploy with KServe InferenceService")
-    print("   • Use custom AASIST predictor") 
+    print("\n📊 MLflow Integration:")
+    print("   • Automatic experiment tracking")
+    print("   • Model Registry management")
+    print("   • Version control and lineage")
+    print("   • Performance metrics logging")
+    
+    print("\n🔗 For production workflows:")
+    print("   • Use kubeflow_pipeline_mlflow_serving.py")
+    print("   • Upload existing models: operation='upload_only'")
+    print("   • Serve from MLflow: operation='serve_only'")
+    print("   • Full workflow: operation='upload_and_serve'") 
