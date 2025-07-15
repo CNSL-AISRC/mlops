@@ -454,7 +454,7 @@ def deploy_model_demo_serving(
     }
     
     # Create Flask serving app
-    flask_app_code = f'''
+    flask_app_code = '''
 import os
 import json
 import numpy as np
@@ -470,34 +470,34 @@ MODEL_CONFIG = {json.dumps(serving_config, indent=2)}
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
-    return jsonify({{
+    return jsonify({
         "status": "healthy",
         "model": "{config_name}",
         "timestamp": datetime.now().isoformat(),
         "version": "demo-1.0"
-    }})
+    })
 
 @app.route('/info', methods=['GET'])
 def model_info():
     """Model information endpoint"""
-    return jsonify({{
+    return jsonify({
         "model_name": "{config_name}",
         "architecture": "AASIST",
-        "performance": {{
+        "performance": {
             "EER_percent": {eval_results.get("EER_percent", 1.0)},
             "min_tDCF": {eval_results.get("min_tDCF", 0.05)}
-        }},
-        "input_format": {{
+        },
+        "input_format": {
             "audio_data": "List of float values (audio samples)",
             "sample_rate": "Integer (default: 16000)",
             "format": "Raw audio array or base64 encoded"
-        }},
-        "output_format": {{
+        },
+        "output_format": {
             "prediction": "bonafide or spoof",
             "confidence": "Float between 0 and 1",
-            "probabilities": {{"bonafide": "float", "spoof": "float"}}
-        }}
-    }})
+            "probabilities": {"bonafide": "float", "spoof": "float"}
+        }
+    })
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -508,18 +508,18 @@ def predict():
         
         # Validate input
         if not data:
-            return jsonify({{"error": "No JSON data provided"}}), 400
+            return jsonify({"error": "No JSON data provided"}), 400
         
         # Check for audio data
         if "audio_data" not in data:
-            return jsonify({{"error": "No audio_data field in request"}}), 400
+            return jsonify({"error": "No audio_data field in request"}), 400
         
         audio_data = data["audio_data"]
         sample_rate = data.get("sample_rate", 16000)
         
         # Validate audio data
         if not isinstance(audio_data, list) or len(audio_data) == 0:
-            return jsonify({{"error": "audio_data must be a non-empty list"}}), 400
+            return jsonify({"error": "audio_data must be a non-empty list"}), 400
         
         # Simulate processing time based on audio length
         processing_time = len(audio_data) / sample_rate * 0.1  # 10% of audio duration
@@ -550,29 +550,29 @@ def predict():
         
         processing_time_ms = (time.time() - start_time) * 1000
         
-        result = {{
+        result = {
             "prediction": "bonafide" if bonafide_prob > spoof_prob else "spoof",
             "confidence": round(confidence, 4),
-            "probabilities": {{
+            "probabilities": {
                 "bonafide": round(bonafide_prob, 4),
                 "spoof": round(spoof_prob, 4)
-            }},
-            "model_info": {{
+            },
+            "model_info": {
                 "name": "{config_name}",
                 "architecture": "AASIST",
                 "version": "demo-1.0"
-            }},
-            "processing_info": {{
+            },
+            "processing_info": {
                 "audio_length_seconds": round(audio_length, 2),
                 "sample_rate": sample_rate,
                 "processing_time_ms": round(processing_time_ms, 2)
-            }}
-        }}
+            }
+        }
         
         return jsonify(result)
         
     except Exception as e:
-        return jsonify({{"error": f"Prediction failed: {{str(e)}}"}}), 500
+        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
 @app.route('/batch_predict', methods=['POST'])
 def batch_predict():
@@ -580,16 +580,16 @@ def batch_predict():
     try:
         data = request.json
         if "instances" not in data:
-            return jsonify({{"error": "No instances field in request"}}), 400
+            return jsonify({"error": "No instances field in request"}), 400
         
         instances = data["instances"]
         if not isinstance(instances, list):
-            return jsonify({{"error": "instances must be a list"}}), 400
+            return jsonify({"error": "instances must be a list"}), 400
         
         results = []
         for i, instance in enumerate(instances):
             if "audio_data" not in instance:
-                results.append({{"error": f"Instance {{i}}: No audio_data field"}})
+                results.append({"error": f"Instance {i}: No audio_data field"})
                 continue
             
             # Simulate individual prediction (simplified)
@@ -597,35 +597,35 @@ def batch_predict():
             spoof_prob = 1.0 - bonafide_prob
             confidence = max(bonafide_prob, spoof_prob)
             
-            result = {{
+            result = {
                 "prediction": "bonafide" if bonafide_prob > spoof_prob else "spoof",
                 "confidence": round(confidence, 4),
-                "probabilities": {{
+                "probabilities": {
                     "bonafide": round(bonafide_prob, 4),
                     "spoof": round(spoof_prob, 4)
-                }}
-            }}
+                }
+            }
             results.append(result)
         
-        return jsonify({{"predictions": results}})
+        return jsonify({"predictions": results})
         
     except Exception as e:
-        return jsonify({{"error": f"Batch prediction failed: {{str(e)}}"}}), 500
+        return jsonify({"error": f"Batch prediction failed: {str(e)}"}), 500
 
 @app.route('/metrics', methods=['GET'])
 def metrics():
     """Basic metrics endpoint"""
-    return jsonify({{
-        "model_performance": {{
+    return jsonify({
+        "model_performance": {
             "EER_percent": {eval_results.get("EER_percent", 1.0)},
             "min_tDCF": {eval_results.get("min_tDCF", 0.05)}
-        }},
-        "serving_stats": {{
+        },
+        "serving_stats": {
             "uptime_seconds": time.time() - MODEL_CONFIG["created_at"],
             "requests_served": "demo_mode",
             "average_response_time_ms": "~100-200ms"
-        }}
-    }})
+        }
+    })
 
 if __name__ == "__main__":
     print("🚀 Starting AASIST Demo Serving API")
@@ -646,7 +646,7 @@ if __name__ == "__main__":
         f.write(flask_app_code)
     
     # Create example client code
-    client_example = f'''
+    client_example = '''
 #!/usr/bin/env python3
 """
 Example client for AASIST Demo Serving API
@@ -660,26 +660,26 @@ SERVING_URL = "http://localhost:8080"
 
 def test_health():
     """Test health endpoint"""
-    response = requests.get(f"{{SERVING_URL}}/health")
-    print(f"Health check: {{response.json()}}")
+    response = requests.get(f"{SERVING_URL}/health")
+    print(f"Health check: {response.json()}")
 
 def test_info():
     """Test model info endpoint"""
-    response = requests.get(f"{{SERVING_URL}}/info")
-    print(f"Model info: {{json.dumps(response.json(), indent=2)}}")
+    response = requests.get(f"{SERVING_URL}/info")
+    print(f"Model info: {json.dumps(response.json(), indent=2)}")
 
 def test_prediction():
     """Test prediction with sample audio"""
     # Generate 1 second of random audio (16kHz)
     sample_audio = np.random.randn(16000).tolist()
     
-    payload = {{
+    payload = {
         "audio_data": sample_audio,
         "sample_rate": 16000
-    }}
+    }
     
-    response = requests.post(f"{{SERVING_URL}}/predict", json=payload)
-    print(f"Prediction result: {{json.dumps(response.json(), indent=2)}}")
+    response = requests.post(f"{SERVING_URL}/predict", json=payload)
+    print(f"Prediction result: {json.dumps(response.json(), indent=2)}")
 
 def test_batch_prediction():
     """Test batch prediction"""
@@ -687,12 +687,12 @@ def test_batch_prediction():
     instances = []
     for i in range(3):
         audio = np.random.randn(8000).tolist()  # 0.5 seconds each
-        instances.append({{"audio_data": audio, "sample_rate": 16000}})
+        instances.append({"audio_data": audio, "sample_rate": 16000})
     
-    payload = {{"instances": instances}}
+    payload = {"instances": instances}
     
-    response = requests.post(f"{{SERVING_URL}}/batch_predict", json=payload)
-    print(f"Batch prediction: {{json.dumps(response.json(), indent=2)}}")
+    response = requests.post(f"{SERVING_URL}/batch_predict", json=payload)
+    print(f"Batch prediction: {json.dumps(response.json(), indent=2)}")
 
 if __name__ == "__main__":
     print("🧪 Testing AASIST Demo Serving API")
@@ -712,13 +712,13 @@ if __name__ == "__main__":
         print()
         
         # Test metrics
-        response = requests.get(f"{{SERVING_URL}}/metrics")
-        print(f"Metrics: {{json.dumps(response.json(), indent=2)}}")
+        response = requests.get(f"{SERVING_URL}/metrics")
+        print(f"Metrics: {json.dumps(response.json(), indent=2)}")
         
     except requests.exceptions.ConnectionError:
         print("❌ Could not connect to serving API. Make sure the server is running.")
     except Exception as e:
-        print(f"❌ Error testing API: {{e}}")
+        print(f"❌ Error testing API: {e}")
 '''
     
     # Save client example
@@ -727,7 +727,7 @@ if __name__ == "__main__":
         f.write(client_example)
     
     # Create serving instructions
-    instructions = f'''
+    instructions = '''
 # AASIST Demo Serving Instructions
 
 ## Quick Start
@@ -762,25 +762,25 @@ import numpy as np
 # Generate sample audio (1 second at 16kHz)
 audio_data = np.random.randn(16000).tolist()
 
-payload = {{
+payload = {
     "audio_data": audio_data,
     "sample_rate": 16000
-}}
+}
 
 response = requests.post("http://localhost:8080/predict", json=payload)
 result = response.json()
-print(f"Prediction: {{result['prediction']}}")
-print(f"Confidence: {{result['confidence']}}")
+print(f"Prediction: {result['prediction']}")
+print(f"Confidence: {result['confidence']}")
 ```
 
 ### Batch Prediction
 ```python
 instances = [
-    {{"audio_data": np.random.randn(16000).tolist(), "sample_rate": 16000}},
-    {{"audio_data": np.random.randn(8000).tolist(), "sample_rate": 16000}}
+    {"audio_data": np.random.randn(16000).tolist(), "sample_rate": 16000},
+    {"audio_data": np.random.randn(8000).tolist(), "sample_rate": 16000}
 ]
 
-payload = {{"instances": instances}}
+payload = {"instances": instances}
 response = requests.post("http://localhost:8080/batch_predict", json=payload)
 ```
 
@@ -891,7 +891,7 @@ def upload_demo_model_to_mlflow(
                 "run_id": run.info.run_id
             }
 
-@pipeline(name='aasist-demo')
+@pipeline(name='demo')
 def aasist_demo_pipeline(
     dataset_url: str = "http://10.5.110.131:8080/LA.zip",  # Real dataset
     config_name: str = "AASIST",

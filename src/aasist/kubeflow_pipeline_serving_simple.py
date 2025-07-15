@@ -42,7 +42,7 @@ def load_and_serve_model(
     os.makedirs(service_output, exist_ok=True)
     
     # Create a simple Flask app for serving
-    flask_app_code = f'''
+    flask_app_code = '''
 import os
 import json
 import numpy as np
@@ -81,11 +81,11 @@ def load_model():
                 import random
                 score = random.uniform(0.1, 0.9)
                 is_bonafide = score > 0.5
-                return {{
+                return {
                     "score": score,
                     "prediction": "bonafide" if is_bonafide else "spoof",
                     "confidence": abs(score - 0.5) * 2
-                }}
+                }
         
         model = MockAASISTModel()
         model.eval()
@@ -93,31 +93,31 @@ def load_model():
         return True
         
     except Exception as e:
-        print(f"Error loading model: {{e}}")
+        print(f"Error loading model: {e}")
         return False
 
 @app.route("/health", methods=["GET"])
 def health_check():
     """Health check endpoint"""
     status = "healthy" if model is not None else "unhealthy"
-    return jsonify({{
+    return jsonify({
         "status": status,
         "service": "{service_name}",
         "model_path": "{model_path}",
         "config": "{config_name}",
         "device": str(device)
-    }})
+    })
 
 @app.route("/predict", methods=["POST"])
 def predict():
     """Audio anti-spoofing prediction endpoint"""
     try:
         if model is None:
-            return jsonify({{"error": "Model not loaded"}}), 500
+            return jsonify({"error": "Model not loaded"}), 500
             
         # Get audio data from request
         if "audio" not in request.json:
-            return jsonify({{"error": "No audio data provided"}}), 400
+            return jsonify({"error": "No audio data provided"}), 400
             
         audio_b64 = request.json["audio"]
         
@@ -127,28 +127,28 @@ def predict():
         # Mock prediction
         result = model.predict(audio_b64)
         
-        return jsonify({{
+        return jsonify({
             "model": "{service_name}",
             "config": "{config_name}",
             "prediction": result["prediction"],
             "score": result["score"],
             "confidence": result["confidence"],
             "timestamp": time.time()
-        }})
+        })
         
     except Exception as e:
-        return jsonify({{"error": str(e)}}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/info", methods=["GET"])
 def model_info():
     """Get model information"""
-    return jsonify({{
+    return jsonify({
         "service_name": "{service_name}",
         "model_path": "{model_path}",
         "config_name": "{config_name}",
         "status": "active" if model is not None else "inactive",
         "endpoints": ["/health", "/predict", "/info"]
-    }})
+    })
 
 if __name__ == "__main__":
     import time
@@ -300,7 +300,7 @@ def test_simple_service(
     
     return test_results
 
-@pipeline(name='aasist-simple-serving')
+@pipeline(name='serving')
 def aasist_simple_serving_pipeline(
     model_path: str = "/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
     config_name: str = "AASIST",

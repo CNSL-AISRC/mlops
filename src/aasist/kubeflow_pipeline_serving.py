@@ -187,7 +187,7 @@ def create_simple_http_service(
     os.makedirs(service_output, exist_ok=True)
     
     # Create a simple Flask app for serving
-    flask_app_code = f'''
+    flask_app_code = '''
 import os
 import json
 import numpy as np
@@ -220,11 +220,11 @@ def load_model():
             return logits
     
     model = MockModel()
-    print(f"Model loaded on {{device}}")
+    print(f"Model loaded on {device}")
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({{"status": "healthy", "model": "{model_name}"}})
+    return jsonify({"status": "healthy", "model": "{model_name}"})
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -236,24 +236,24 @@ def predict():
         spoof_prob = 1.0 - bonafide_prob
         confidence = max(bonafide_prob, spoof_prob)
         
-        result = {{
+        result = {
             "prediction": "bonafide" if bonafide_prob > spoof_prob else "spoof",
             "confidence": confidence,
-            "probabilities": {{
+            "probabilities": {
                 "bonafide": bonafide_prob,
                 "spoof": spoof_prob
-            }},
-            "model_info": {{
+            },
+            "model_info": {
                 "name": "{model_name}",
                 "architecture": "AASIST",
                 "device": str(device)
-            }}
-        }}
+            }
+        }
         
         return jsonify(result)
         
     except Exception as e:
-        return jsonify({{"error": str(e)}}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     load_model()
@@ -278,7 +278,7 @@ soundfile>=0.12.1
         f.write(requirements)
     
     # Create Docker file for the service
-    dockerfile_content = f'''
+    dockerfile_content = '''
 FROM python:3.9-slim
 
 WORKDIR /app
@@ -484,7 +484,7 @@ def test_inference_service(
     print(f"Test completed. Results saved to {test_output}")
     return test_results
 
-@pipeline(name='aasist-serving')
+@pipeline(name='serve')
 def aasist_serving_pipeline(
     model_path: str = "/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
     config_name: str = "AASIST",

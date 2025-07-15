@@ -50,7 +50,7 @@ def run_serving_pipeline(model_path="/home/jovyan/mlops/src/aasist/models/weight
         print("🔧 Compiling serving pipeline...")
         kfp.compiler.Compiler().compile(
             aasist_simple_serving_pipeline, 
-            'aasist_simple_serving.yaml'
+            'serving.yaml'
         )
         print("✅ Serving pipeline compiled successfully!")
         

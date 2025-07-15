@@ -76,7 +76,7 @@ def run_mlflow_pipeline(operation="upload_and_serve",
         print("🔧 Compiling pipeline...")
         kfp.compiler.Compiler().compile(
             aasist_mlflow_serving_pipeline, 
-            'aasist_mlflow.yaml'
+            'upload.yaml'
         )
         print("✅ Pipeline compiled successfully!")
         
@@ -84,42 +84,69 @@ def run_mlflow_pipeline(operation="upload_and_serve",
         print(f"🚀 Starting pipeline run with operation: {operation}")
         
         import time
-        timestamp = str(int(time.time()))
-        simple_run_name = f"aasist-mlflow-{timestamp}"
+        import random
         
-        try:
-            run = client.create_run_from_pipeline_func(
-                aasist_mlflow_serving_pipeline, 
-                arguments={
-                    'operation': operation,
-                    'model_path': model_path,
-                    'model_name': model_name,
-                    'model_version': model_version,
-                    'model_stage': model_stage,
-                    'config_name': config_name
-                },
-                enable_caching=False,
-                run_name=simple_run_name
-            )
-        except Exception as e:
-            print(f"⚠️  First attempt failed (likely DB collation issue): {str(e)[:100]}...")
-            print("🔄 Trying with minimal run name...")
-            
-            # Fallback with even simpler name
-            simple_name = f"mlflow{timestamp[-6:]}"
-            run = client.create_run_from_pipeline_func(
-                aasist_mlflow_serving_pipeline, 
-                arguments={
-                    'operation': operation,
-                    'model_path': model_path,
-                    'model_name': model_name,
-                    'model_version': model_version,
-                    'model_stage': model_stage,
-                    'config_name': config_name
-                },
-                enable_caching=False,
-                run_name=simple_name
-            )
+        # Try extremely simple names to avoid collation issues
+        simple_names = [
+            f"run{random.randint(1000, 9999)}",  # run1234
+            f"r{random.randint(100000, 999999)}",  # r123456
+            f"a{int(time.time()) % 100000}",  # a12345
+            f"test{random.randint(100, 999)}"  # test123
+        ]
+        
+        last_error = None
+        for i, run_name in enumerate(simple_names):
+            try:
+                print(f"🔄 Attempt {i+1}/4: Using run name '{run_name}'")
+                run = client.create_run_from_pipeline_func(
+                    aasist_mlflow_serving_pipeline, 
+                    arguments={
+                        'operation': operation,
+                        'model_path': model_path,
+                        'model_name': model_name,
+                        'model_version': model_version,
+                        'model_stage': model_stage,
+                        'config_name': config_name
+                    },
+                    enable_caching=False,
+                    run_name=run_name
+                )
+                print(f"✅ Success with run name: {run_name}")
+                break
+            except Exception as e:
+                last_error = e
+                print(f"❌ Failed with '{run_name}': {str(e)[:100]}...")
+                if i < len(simple_names) - 1:
+                    print(f"🔄 Trying next name...")
+                    continue
+                else:
+                    print("❌ All name attempts failed. This is a Kubeflow database collation issue.")
+                    print("💡 Possible solutions:")
+                    print("   1. Ask your admin to fix MySQL collation in Kubeflow database")
+                    print("   2. Try running without explicit run names")
+                    print("   3. Use a different Kubeflow installation")
+                    
+                    # Last attempt without explicit run name
+                    print("🔄 Final attempt: No explicit run name...")
+                    try:
+                        run = client.create_run_from_pipeline_func(
+                            aasist_mlflow_serving_pipeline, 
+                            arguments={
+                                'operation': operation,
+                                'model_path': model_path,
+                                'model_name': model_name,
+                                'model_version': model_version,
+                                'model_stage': model_stage,
+                                'config_name': config_name
+                            },
+                            enable_caching=False
+                            # No run_name parameter - let Kubeflow generate it
+                        )
+                        print("✅ Success without explicit run name!")
+                        break
+                    except Exception as final_e:
+                        print(f"❌ Final attempt also failed: {str(final_e)[:100]}...")
+                        raise final_e
         
         print(f"✅ Pipeline started successfully!")
         print(f"📊 Run ID: {run.run_id}")

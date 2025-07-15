@@ -10,22 +10,22 @@ import os
 # Base image for MLflow operations
 MLFLOW_BASE_IMAGE = "python:3.9-slim"
 
-# Packages for MLflow and serving
+# Packages for MLflow and serving (compatible with Python 3.9)
 MLFLOW_PACKAGES = [
     "mlflow==2.15.1",
     "boto3==1.34.162",
-    "requests",
-    "numpy>=2.3.1",
-    "torch>=2.0.0",
-    "soundfile>=0.13.1",
-    "flask==2.3.2"
+    "requests==2.31.0",
+    "numpy==1.24.3",
+    "torch==2.0.1",
+    "soundfile==0.12.1",
+    "flask==2.3.3"
 ]
 
 @component(
     base_image=MLFLOW_BASE_IMAGE,
     packages_to_install=MLFLOW_PACKAGES
 )
-def upload_pretrained_model_to_mlflow(
+def upload_pretrained_model(
     model_path: str,
     model_name: str,
     model_output: OutputPath('Model'),
@@ -180,7 +180,7 @@ def upload_pretrained_model_to_mlflow(
     base_image=MLFLOW_BASE_IMAGE,
     packages_to_install=MLFLOW_PACKAGES
 )
-def load_model_from_mlflow(
+def load_model_from_registry(
     model_name: str,
     model_output: OutputPath('Model'),
     model_version: str = "latest",
@@ -265,7 +265,7 @@ def load_model_from_mlflow(
     base_image=MLFLOW_BASE_IMAGE,
     packages_to_install=MLFLOW_PACKAGES
 )
-def create_mlflow_serving_endpoint(
+def create_serving_endpoint(
     model: InputPath('Model'),
     model_info: dict,
     serving_output: OutputPath('Serving')
@@ -286,7 +286,7 @@ def create_mlflow_serving_endpoint(
     model_version = model_info.get('model_version', '1')
     
     # Create Flask serving app for MLflow model
-    flask_app_code = f'''
+    flask_app_code = '''
 import os
 import json
 import numpy as np
@@ -310,7 +310,7 @@ def load_model():
     global model
     try:
         model_uri = MODEL_INFO.get("model_uri", "models:/{model_name}/{model_version}")
-        print(f"Loading model from MLflow: {{model_uri}}")
+        print(f"Loading model from MLflow: {model_uri}")
         
         # For demo, use mock model since we may not have actual MLflow server
         class MockMLflowModel:
@@ -327,14 +327,14 @@ def load_model():
                         spoof_prob = 1.0 - bonafide_prob
                         confidence = max(bonafide_prob, spoof_prob)
                         
-                        result = {{
+                        result = {
                             "prediction": "bonafide" if bonafide_prob > spoof_prob else "spoof",
                             "confidence": round(confidence, 4),
-                            "probabilities": {{
+                            "probabilities": {
                                 "bonafide": round(bonafide_prob, 4),
                                 "spoof": round(spoof_prob, 4)
-                            }}
-                        }}
+                            }
+                        }
                         results.append(result)
                     return results
                 else:
@@ -343,159 +343,159 @@ def load_model():
                     spoof_prob = 1.0 - bonafide_prob
                     confidence = max(bonafide_prob, spoof_prob)
                     
-                    return {{
+                    return {
                         "prediction": "bonafide" if bonafide_prob > spoof_prob else "spoof",
                         "confidence": round(confidence, 4),
-                        "probabilities": {{
+                        "probabilities": {
                             "bonafide": round(bonafide_prob, 4),
                             "spoof": round(spoof_prob, 4)
-                        }}
-                    }}
+                        }
+                    }
         
         model = MockMLflowModel(MODEL_INFO)
-        print(f"Model loaded successfully: {{MODEL_NAME}} v{{MODEL_VERSION}}")
+        print(f"Model loaded successfully: {MODEL_NAME} v{MODEL_VERSION}")
         
     except Exception as e:
-        print(f"Error loading model: {{e}}")
+        print(f"Error loading model: {e}")
         model = None
 
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
-    return jsonify({{
+    return jsonify({
         "status": "healthy" if model else "unhealthy",
         "model_name": MODEL_NAME,
         "model_version": MODEL_VERSION,
         "model_stage": MODEL_INFO.get("model_stage", "unknown"),
         "timestamp": datetime.now().isoformat(),
         "mlflow_uri": MODEL_INFO.get("model_uri", "unknown")
-    }})
+    })
 
 @app.route('/info', methods=['GET'])
 def model_info():
     """Model information endpoint"""
-    return jsonify({{
+    return jsonify({
         "model_name": MODEL_NAME,
         "model_version": MODEL_VERSION,
         "model_stage": MODEL_INFO.get("model_stage", "unknown"),
         "mlflow_info": MODEL_INFO,
         "architecture": "AASIST",
-        "input_format": {{
+        "input_format": {
             "audio_data": "List of float values (audio samples)",
             "sample_rate": "Integer (default: 16000)",
             "format": "Raw audio array"
-        }},
-        "output_format": {{
+        },
+        "output_format": {
             "prediction": "bonafide or spoof",
             "confidence": "Float between 0 and 1",
-            "probabilities": {{"bonafide": "float", "spoof": "float"}}
-        }},
-        "endpoints": {{
+            "probabilities": {"bonafide": "float", "spoof": "float"}
+        },
+        "endpoints": {
             "health": "/health",
             "info": "/info", 
             "predict": "/predict",
             "batch": "/batch_predict",
             "metrics": "/metrics"
-        }}
-    }})
+        }
+    })
 
 @app.route('/predict', methods=['POST'])
 def predict():
     """Single prediction endpoint"""
     if not model:
-        return jsonify({{"error": "Model not loaded"}}), 500
+        return jsonify({"error": "Model not loaded"}), 500
         
     try:
         start_time = time.time()
         data = request.json
         
         if not data or "audio_data" not in data:
-            return jsonify({{"error": "No audio_data provided"}}), 400
+            return jsonify({"error": "No audio_data provided"}), 400
         
         audio_data = data["audio_data"]
         sample_rate = data.get("sample_rate", 16000)
         
         if not isinstance(audio_data, list) or len(audio_data) == 0:
-            return jsonify({{"error": "audio_data must be a non-empty list"}}), 400
+            return jsonify({"error": "audio_data must be a non-empty list"}), 400
         
         # Get prediction from model
         result = model.predict(audio_data)
         
         # Add processing info
         processing_time_ms = (time.time() - start_time) * 1000
-        result["model_info"] = {{
+        result["model_info"] = {
             "name": MODEL_NAME,
             "version": MODEL_VERSION,
             "stage": MODEL_INFO.get("model_stage", "unknown"),
             "architecture": "AASIST"
-        }}
-        result["processing_info"] = {{
+        }
+        result["processing_info"] = {
             "audio_length_seconds": round(len(audio_data) / sample_rate, 2),
             "sample_rate": sample_rate,
             "processing_time_ms": round(processing_time_ms, 2)
-        }}
+        }
         
         return jsonify(result)
         
     except Exception as e:
-        return jsonify({{"error": f"Prediction failed: {{str(e)}}"}}), 500
+        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
 @app.route('/batch_predict', methods=['POST'])
 def batch_predict():
     """Batch prediction endpoint"""
     if not model:
-        return jsonify({{"error": "Model not loaded"}}), 500
+        return jsonify({"error": "Model not loaded"}), 500
         
     try:
         data = request.json
         if "instances" not in data:
-            return jsonify({{"error": "No instances field in request"}}), 400
+            return jsonify({"error": "No instances field in request"}), 400
         
         instances = data["instances"]
         if not isinstance(instances, list):
-            return jsonify({{"error": "instances must be a list"}}), 400
+            return jsonify({"error": "instances must be a list"}), 400
         
         # Extract audio data from instances
         audio_samples = []
         for i, instance in enumerate(instances):
             if "audio_data" not in instance:
-                return jsonify({{"error": f"Instance {{i}}: No audio_data field"}}), 400
+                return jsonify({"error": f"Instance {i}: No audio_data field"}), 400
             audio_samples.append(instance["audio_data"])
         
         # Get batch predictions
         results = model.predict(audio_samples)
         
-        return jsonify({{"predictions": results}})
+        return jsonify({"predictions": results})
         
     except Exception as e:
-        return jsonify({{"error": f"Batch prediction failed: {{str(e)}}"}}), 500
+        return jsonify({"error": f"Batch prediction failed: {str(e)}"}), 500
 
 @app.route('/metrics', methods=['GET'])
 def metrics():
     """Metrics endpoint"""
-    return jsonify({{
-        "model_info": {{
+    return jsonify({
+        "model_info": {
             "name": MODEL_NAME,
             "version": MODEL_VERSION,
             "stage": MODEL_INFO.get("model_stage", "unknown"),
             "mlflow_uri": MODEL_INFO.get("model_uri", "unknown")
-        }},
-        "serving_stats": {{
+        },
+        "serving_stats": {
             "status": "healthy" if model else "unhealthy",
             "uptime_info": "Model loaded from MLflow Registry",
             "endpoint_type": "mlflow_serving"
-        }},
-        "creation_info": {{
+        },
+        "creation_info": {
             "creation_timestamp": MODEL_INFO.get("creation_timestamp", "unknown"),
             "last_updated": MODEL_INFO.get("last_updated_timestamp", "unknown")
-        }}
-    }})
+        }
+    })
 
 if __name__ == "__main__":
     print("🚀 Starting AASIST MLflow Serving API")
-    print(f"Model: {{MODEL_NAME}} v{{MODEL_VERSION}}")
-    print(f"Stage: {{MODEL_INFO.get('model_stage', 'unknown')}}")
-    print(f"MLflow URI: {{MODEL_INFO.get('model_uri', 'unknown')}}")
+    print(f"Model: {MODEL_NAME} v{MODEL_VERSION}")
+    print(f"Stage: {MODEL_INFO.get('model_stage', 'unknown')}")
+    print(f"MLflow URI: {MODEL_INFO.get('model_uri', 'unknown')}")
     print("Endpoints:")
     print("  - Health: http://localhost:8080/health")
     print("  - Info: http://localhost:8080/info")
@@ -513,7 +513,7 @@ if __name__ == "__main__":
         f.write(flask_app_code)
     
     # Create client example for MLflow serving
-    client_code = f'''
+    client_code = '''
 #!/usr/bin/env python3
 """
 Example client for AASIST MLflow Serving API
@@ -524,7 +524,7 @@ import json
 
 SERVING_URL = "http://localhost:8080"
 
-def test_mlflow_serving():
+def test_serving_api():
     """Test MLflow serving endpoint"""
     print("🧪 Testing AASIST MLflow Serving API")
     print("=" * 50)
@@ -532,41 +532,41 @@ def test_mlflow_serving():
     try:
         # Health check
         print("1. Health Check:")
-        response = requests.get(f"{{SERVING_URL}}/health")
+        response = requests.get(SERVING_URL + "/health")
         print(json.dumps(response.json(), indent=2))
         print()
         
         # Model info
         print("2. Model Information:")
-        response = requests.get(f"{{SERVING_URL}}/info")
+        response = requests.get(SERVING_URL + "/info")
         print(json.dumps(response.json(), indent=2))
         print()
         
         # Single prediction
         print("3. Single Prediction:")
         audio_data = np.random.randn(16000).tolist()  # 1 second
-        payload = {{
+        payload = {
             "audio_data": audio_data,
             "sample_rate": 16000
-        }}
-        response = requests.post(f"{{SERVING_URL}}/predict", json=payload)
+        }
+        response = requests.post(SERVING_URL + "/predict", json=payload)
         print(json.dumps(response.json(), indent=2))
         print()
         
         # Batch prediction
         print("4. Batch Prediction:")
         instances = [
-            {{"audio_data": np.random.randn(8000).tolist(), "sample_rate": 16000}},
-            {{"audio_data": np.random.randn(16000).tolist(), "sample_rate": 16000}}
+            {"audio_data": np.random.randn(8000).tolist(), "sample_rate": 16000},
+            {"audio_data": np.random.randn(16000).tolist(), "sample_rate": 16000}
         ]
-        batch_payload = {{"instances": instances}}
-        response = requests.post(f"{{SERVING_URL}}/batch_predict", json=batch_payload)
+        batch_payload = {"instances": instances}
+        response = requests.post(SERVING_URL + "/batch_predict", json=batch_payload)
         print(json.dumps(response.json(), indent=2))
         print()
         
         # Metrics
         print("5. Metrics:")
-        response = requests.get(f"{{SERVING_URL}}/metrics")
+        response = requests.get(SERVING_URL + "/metrics")
         print(json.dumps(response.json(), indent=2))
         
         print("\\n✅ All tests completed successfully!")
@@ -575,7 +575,7 @@ def test_mlflow_serving():
         print("❌ Could not connect to serving API. Make sure the server is running:")
         print("   python mlflow_serving_app.py")
     except Exception as e:
-        print(f"❌ Error testing API: {{e}}")
+        print("❌ Error testing API: " + str(e))
 
 if __name__ == "__main__":
     test_mlflow_serving()
@@ -609,7 +609,7 @@ if __name__ == "__main__":
         json.dump(serving_config, f, indent=2)
     
     # Create instructions
-    instructions = f'''
+    instructions = '''
 # AASIST MLflow Serving
 
 ## Model Information
@@ -648,7 +648,7 @@ curl http://localhost:8080/info
 ```bash
 curl -X POST http://localhost:8080/predict \\
   -H "Content-Type: application/json" \\
-  -d '{{"audio_data": [0.1, 0.2, 0.3], "sample_rate": 16000}}'
+  -d '{"audio_data": [0.1, 0.2, 0.3], "sample_rate": 16000}'
 ```
 
 This serving endpoint loads the model directly from MLflow Model Registry
@@ -667,7 +667,7 @@ and provides production-ready inference capabilities.
     
     return serving_config
 
-@pipeline(name='aasist-mlflow')
+@pipeline(name='upload')
 def aasist_mlflow_serving_pipeline(
     model_path: str = "/home/jovyan/mlops/src/aasist/models/weights/AASIST.pth",
     model_name: str = "aasist_production_model",
@@ -695,7 +695,7 @@ def aasist_mlflow_serving_pipeline(
     
     if operation in ["upload_only", "upload_and_serve"]:
         # Upload model to MLflow
-        upload_task = upload_pretrained_model_to_mlflow(
+        upload_task = upload_pretrained_model(
             model_path=model_path,
             model_name=model_name,
             model_version=model_version,
@@ -706,7 +706,7 @@ def aasist_mlflow_serving_pipeline(
         
         if operation == "upload_and_serve":
             # Serve the uploaded model
-            serving_task = create_mlflow_serving_endpoint(
+            serving_task = create_serving_endpoint(
                 model=upload_task.outputs['model_output'],
                 model_info=upload_task.outputs['Output']
             )
@@ -714,14 +714,14 @@ def aasist_mlflow_serving_pipeline(
     
     elif operation == "serve_only":
         # Load existing model from MLflow and serve
-        load_task = load_model_from_mlflow(
+        load_task = load_model_from_registry(
             model_name=model_name,
             model_version=model_version,
             model_stage=model_stage
         )
         load_task.set_memory_limit("4Gi").set_cpu_limit("2")
         
-        serving_task = create_mlflow_serving_endpoint(
+        serving_task = create_serving_endpoint(
             model=load_task.outputs['model_output'],
             model_info=load_task.outputs['Output']
         )

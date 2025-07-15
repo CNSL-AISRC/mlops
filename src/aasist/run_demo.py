@@ -68,7 +68,7 @@ def run_demo_pipeline(dataset_url="http://10.5.110.131:8080/LA.zip",
         print("🔧 Compiling demo pipeline...")
         kfp.compiler.Compiler().compile(
             aasist_demo_pipeline, 
-            'aasist_demo.yaml'
+            'demo.yaml'
         )
         print("✅ Demo pipeline compiled successfully!")
         
