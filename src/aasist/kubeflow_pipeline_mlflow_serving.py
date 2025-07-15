@@ -28,10 +28,10 @@ MLFLOW_PACKAGES = [
 def upload_pretrained_model_to_mlflow(
     model_path: str,
     model_name: str,
+    model_output: OutputPath('Model'),
     model_version: str = "1.0",
     model_stage: str = "Staging",
-    config_name: str = "AASIST",
-    model_output: OutputPath('Model')
+    config_name: str = "AASIST"
 ) -> dict:
     """Upload a pretrained AASIST model to MLflow Model Registry"""
     import os
@@ -182,9 +182,9 @@ def upload_pretrained_model_to_mlflow(
 )
 def load_model_from_mlflow(
     model_name: str,
+    model_output: OutputPath('Model'),
     model_version: str = "latest",
-    model_stage: str = "Production",
-    model_output: OutputPath('Model')
+    model_stage: str = "Production"
 ) -> dict:
     """Load a model from MLflow Model Registry for serving"""
     import os
