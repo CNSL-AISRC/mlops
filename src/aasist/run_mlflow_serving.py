@@ -80,20 +80,46 @@ def run_mlflow_pipeline(operation="upload_and_serve",
         )
         print("✅ Pipeline compiled successfully!")
         
-        # Run pipeline
+        # Run pipeline with simplified naming to avoid collation issues
         print(f"🚀 Starting pipeline run with operation: {operation}")
-        run = client.create_run_from_pipeline_func(
-            aasist_mlflow_serving_pipeline, 
-            arguments={
-                'operation': operation,
-                'model_path': model_path,
-                'model_name': model_name,
-                'model_version': model_version,
-                'model_stage': model_stage,
-                'config_name': config_name
-            },
-            enable_caching=False
-        )
+        
+        import time
+        timestamp = str(int(time.time()))
+        simple_run_name = f"aasist-mlflow-{timestamp}"
+        
+        try:
+            run = client.create_run_from_pipeline_func(
+                aasist_mlflow_serving_pipeline, 
+                arguments={
+                    'operation': operation,
+                    'model_path': model_path,
+                    'model_name': model_name,
+                    'model_version': model_version,
+                    'model_stage': model_stage,
+                    'config_name': config_name
+                },
+                enable_caching=False,
+                run_name=simple_run_name
+            )
+        except Exception as e:
+            print(f"⚠️  First attempt failed (likely DB collation issue): {str(e)[:100]}...")
+            print("🔄 Trying with minimal run name...")
+            
+            # Fallback with even simpler name
+            simple_name = f"mlflow{timestamp[-6:]}"
+            run = client.create_run_from_pipeline_func(
+                aasist_mlflow_serving_pipeline, 
+                arguments={
+                    'operation': operation,
+                    'model_path': model_path,
+                    'model_name': model_name,
+                    'model_version': model_version,
+                    'model_stage': model_stage,
+                    'config_name': config_name
+                },
+                enable_caching=False,
+                run_name=simple_name
+            )
         
         print(f"✅ Pipeline started successfully!")
         print(f"📊 Run ID: {run.run_id}")
