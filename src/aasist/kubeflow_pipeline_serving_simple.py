@@ -8,13 +8,13 @@ from kfp.dsl import pipeline, component, OutputPath
 # Lightweight base image
 BASE_IMAGE = "pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime"
 
-# Minimal packages
+# Minimal packages (compatible with Python 3.10)
 SERVING_PACKAGES = [
-    "numpy>=2.3.1",
-    "soundfile>=0.13.1", 
-    "flask==3.0.0",
-    "requests",
-    "tqdm>=4.67.1"
+    "numpy==1.24.3",
+    "soundfile==0.12.1", 
+    "flask==2.3.3",
+    "requests==2.31.0",
+    "tqdm==4.65.0"
 ]
 
 @component(
@@ -169,18 +169,18 @@ if __name__ == "__main__":
         f.write(flask_app_code)
     
     # Create service info
-    service_info = {{
+    service_info = {
         "service_name": service_name,
         "model_path": model_path,
         "config_name": config_name,
         "status": "created",
-        "endpoints": {{
-            "health": f"http://{{service_name}}:5000/health",
-            "predict": f"http://{{service_name}}:5000/predict",
-            "info": f"http://{{service_name}}:5000/info"
-        }},
+        "endpoints": {
+            "health": f"http://{service_name}:5000/health",
+            "predict": f"http://{service_name}:5000/predict",
+            "info": f"http://{service_name}:5000/info"
+        },
         "app_file": app_file
-    }}
+    }
     
     # Save service info
     info_file = os.path.join(service_output, "service_info.json")
@@ -188,8 +188,8 @@ if __name__ == "__main__":
         json.dump(service_info, f, indent=2)
     
     print(f"Service created successfully!")
-    print(f"App file: {{app_file}}")
-    print(f"Service info: {{info_file}}")
+    print(f"App file: {app_file}")
+    print(f"Service info: {info_file}")
     
     # Try to start the service (simplified for demo)
     print("Service deployment completed (demo mode)")
@@ -211,7 +211,7 @@ def test_simple_service(
     import requests
     from datetime import datetime
     
-    print(f"Testing service: {{service_info.get('service_name', 'unknown')}}")
+    print(f"Testing service: {service_info.get('service_name', 'unknown')}")
     
     # Create output directory
     os.makedirs(test_output, exist_ok=True)
@@ -228,7 +228,7 @@ def test_simple_service(
     health_test = {{
         "test_name": "health_check",
         "status": "simulated_pass",
-        "response": {{"status": "healthy", "service": service_info.get("service_name")}},
+        "response": {"status": "healthy", "service": service_info.get("service_name")},
         "response_time_ms": 45.2
     }}
     test_results["tests"].append(health_test)
@@ -267,7 +267,7 @@ def test_simple_service(
     test_results["summary"] = {{
         "total_tests": total_tests,
         "passed_tests": passed_tests,
-        "success_rate": f"{{passed_tests}}/{{total_tests}}",
+        "success_rate": f"{passed_tests}/{total_tests}",
         "overall_status": "pass" if passed_tests == total_tests else "fail"
     }}
     
@@ -281,22 +281,22 @@ def test_simple_service(
     with open(report_file, 'w') as f:
         f.write(f"AASIST Serving Service Test Report\\n")
         f.write(f"{'='*50}\\n")
-        f.write(f"Service: {{service_info.get('service_name')}}\\n")
-        f.write(f"Model: {{service_info.get('model_path')}}\\n")
-        f.write(f"Config: {{service_info.get('config_name')}}\\n")
-        f.write(f"Test Time: {{test_results['test_timestamp']}}\\n\\n")
+        f.write(f"Service: {service_info.get('service_name')}\\n")
+        f.write(f"Model: {service_info.get('model_path')}\\n")
+        f.write(f"Config: {service_info.get('config_name')}\\n")
+        f.write(f"Test Time: {test_results['test_timestamp']}\\n\\n")
         
         f.write(f"Test Results:\\n")
         for test in test_results["tests"]:
             status_icon = "✅" if "pass" in test["status"] else "❌"
-            f.write(f"  {{status_icon}} {{test['test_name']}}: {{test['status']}}\\n")
-            f.write(f"     Response time: {{test['response_time_ms']:.1f}ms\\n")
+            f.write(f"  {status_icon} {test['test_name']}: {test['status']}\\n")
+            f.write(f"     Response time: {test['response_time_ms']:.1f}ms\\n")
         
-        f.write(f"\\nSummary: {{test_results['summary']['success_rate']}} tests passed\\n")
-        f.write(f"Overall Status: {{test_results['summary']['overall_status'].upper()}}\\n")
+        f.write(f"\\nSummary: {test_results['summary']['success_rate']} tests passed\\n")
+        f.write(f"Overall Status: {test_results['summary']['overall_status'].upper()}\\n")
     
-    print(f"Test completed! Results saved to {{test_output}}")
-    print(f"Summary: {{test_results['summary']['success_rate']}} tests passed")
+    print(f"Test completed! Results saved to {test_output}")
+    print(f"Summary: {test_results['summary']['success_rate']} tests passed")
     
     return test_results
 
@@ -317,9 +317,9 @@ def aasist_simple_serving_pipeline(
     """
     
     print(f"🚀 Starting simple AASIST serving pipeline")
-    print(f"📁 Model: {{model_path}}")
-    print(f"⚙️  Config: {{config_name}}")
-    print(f"🏷️  Service: {{service_name}}")
+    print(f"📁 Model: {model_path}")
+    print(f"⚙️  Config: {config_name}")
+    print(f"🏷️  Service: {service_name}")
     
     # Step 1: Load model and create serving endpoint
     serve_task = load_and_serve_model(
@@ -330,7 +330,7 @@ def aasist_simple_serving_pipeline(
     
     # Step 2: Test the service
     test_task = test_simple_service(
-        service_info=serve_task.output
+        service_info=serve_task.outputs['Output']
     )
     
     # Set resource limits
