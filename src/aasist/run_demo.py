@@ -68,21 +68,45 @@ def run_demo_pipeline(dataset_url="mock://demo_dataset",
         print("🔧 Compiling demo pipeline...")
         kfp.compiler.Compiler().compile(
             aasist_demo_pipeline, 
-            'aasist_demo_pipeline.yaml'
+            'aasist_demo.yaml'
         )
         print("✅ Demo pipeline compiled successfully!")
         
-        # Run pipeline
+        # Run pipeline with simplified naming to avoid collation issues
         print(f"🚀 Starting demo pipeline run...")
-        run = client.create_run_from_pipeline_func(
-            aasist_demo_pipeline, 
-            arguments={
-                'dataset_url': dataset_url,
-                'config_name': config_name,
-                'model_name': model_name
-            },
-            enable_caching=False
-        )
+        
+        # Try with simple experiment name first
+        import time
+        timestamp = str(int(time.time()))
+        simple_run_name = f"aasist-demo-{timestamp}"
+        
+        try:
+            run = client.create_run_from_pipeline_func(
+                aasist_demo_pipeline, 
+                arguments={
+                    'dataset_url': dataset_url,
+                    'config_name': config_name,
+                    'model_name': model_name
+                },
+                enable_caching=False,
+                run_name=simple_run_name
+            )
+        except Exception as e:
+            print(f"⚠️  First attempt failed (likely DB collation issue): {str(e)[:100]}...")
+            print("🔄 Trying with minimal run name...")
+            
+            # Fallback with even simpler name
+            simple_name = f"demo{timestamp[-6:]}"
+            run = client.create_run_from_pipeline_func(
+                aasist_demo_pipeline, 
+                arguments={
+                    'dataset_url': dataset_url,
+                    'config_name': config_name,
+                    'model_name': model_name
+                },
+                enable_caching=False,
+                run_name=simple_name
+            )
         
         print(f"✅ Demo pipeline started successfully!")
         print(f"📊 Run ID: {run.run_id}")

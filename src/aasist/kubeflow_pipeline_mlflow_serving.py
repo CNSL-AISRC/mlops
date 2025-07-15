@@ -667,7 +667,7 @@ and provides production-ready inference capabilities.
     
     return serving_config
 
-@pipeline(name='aasist-mlflow-serving-pipeline')
+@pipeline(name='aasist-mlflow')
 def aasist_mlflow_serving_pipeline(
     model_path: str = "path/to/your/model.pth",
     model_name: str = "aasist_production_model",

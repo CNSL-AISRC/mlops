@@ -484,7 +484,7 @@ def test_inference_service(
     print(f"Test completed. Results saved to {test_output}")
     return test_results
 
-@pipeline(name='aasist-serving-pipeline')
+@pipeline(name='aasist-serving')
 def aasist_serving_pipeline(
     model_name: str = "aasist_demo_model",
     service_name: str = "aasist-serving",

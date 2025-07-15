@@ -358,7 +358,7 @@ def distributed_train_aasist(
         model_uri = f"{run.info.artifact_uri}/model"
         return model_uri
 
-@pipeline(name='aasist-training-pipeline')
+@pipeline(name='aasist-training')
 def aasist_training_pipeline(
     dataset_url: str = "https://datashare.ed.ac.uk/bitstream/handle/10283/3336/LA.zip",
     config_name: str = "AASIST",

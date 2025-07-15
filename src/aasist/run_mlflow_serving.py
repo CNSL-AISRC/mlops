@@ -76,7 +76,7 @@ def run_mlflow_pipeline(operation="upload_and_serve",
         print("🔧 Compiling pipeline...")
         kfp.compiler.Compiler().compile(
             aasist_mlflow_serving_pipeline, 
-            'aasist_mlflow_serving_pipeline.yaml'
+            'aasist_mlflow.yaml'
         )
         print("✅ Pipeline compiled successfully!")
         

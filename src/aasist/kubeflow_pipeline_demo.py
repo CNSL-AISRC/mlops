@@ -922,7 +922,7 @@ def upload_demo_model_to_mlflow(
                 "run_id": run.info.run_id
             }
 
-@pipeline(name='aasist-demo-pipeline')
+@pipeline(name='aasist-demo')
 def aasist_demo_pipeline(
     dataset_url: str = "mock://demo_dataset",  # Use mock for faster demo
     config_name: str = "AASIST",
