@@ -708,7 +708,7 @@ def aasist_mlflow_serving_pipeline(
             # Serve the uploaded model
             serving_task = create_mlflow_serving_endpoint(
                 model=upload_task.outputs['model_output'],
-                model_info=upload_task.output
+                model_info=upload_task.outputs['Output']
             )
             serving_task.set_memory_limit("4Gi").set_cpu_limit("2")
     
@@ -723,7 +723,7 @@ def aasist_mlflow_serving_pipeline(
         
         serving_task = create_mlflow_serving_endpoint(
             model=load_task.outputs['model_output'],
-            model_info=load_task.output
+            model_info=load_task.outputs['Output']
         )
         serving_task.set_memory_limit("4Gi").set_cpu_limit("2")
     
