@@ -373,40 +373,40 @@ class CONV(nn.Module):
         filbandwidthsf = self.to_hz(filbandwidthsmel)
 
         self.mel = filbandwidthsf
-        self.hsupp = torch.arange(-(self.kernel_size - 1) / 2,
-                                  (self.kernel_size - 1) / 2 + 1)
-        self.band_pass = torch.zeros(self.out_channels, self.kernel_size)
+        hsupp = torch.arange(-(self.kernel_size - 1) / 2,
+                            (self.kernel_size - 1) / 2 + 1)
+        self.register_buffer('hsupp', hsupp)
+        
+        band_pass = torch.zeros(self.out_channels, self.kernel_size)
         for i in range(len(self.mel) - 1):
             fmin = self.mel[i]
             fmax = self.mel[i + 1]
             hHigh = (2*fmax/self.sample_rate) * \
-                np.sinc(2*fmax*self.hsupp/self.sample_rate)
+                np.sinc(2*fmax*hsupp/self.sample_rate)
             hLow = (2*fmin/self.sample_rate) * \
-                np.sinc(2*fmin*self.hsupp/self.sample_rate)
+                np.sinc(2*fmin*hsupp/self.sample_rate)
             hideal = hHigh - hLow
 
-            self.band_pass[i, :] = Tensor(np.hamming(
+            band_pass[i, :] = Tensor(np.hamming(
                 self.kernel_size)) * Tensor(hideal)
         
-        self.filters = torch.empty(0) # for tracing
+        self.register_buffer('band_pass', band_pass)
+        # Initialize filters with proper shape - will be updated in forward()
+        self.register_buffer('filters', band_pass.view(self.out_channels, 1, self.kernel_size))
 
     def forward(self, x, mask:bool=False):
-        band_pass_filter = self.band_pass.clone().to(x.device)
+        # Use the registered filters as base
+        filters = self.filters.clone()
+        
         if mask:
-            #A = np.random.uniform(0, 20)
+            # Create mask without reassigning self.filters
             A = int(torch.randint(0, 20, (1,)).item()) 
-            #A = int(A)
-            #A0 = random.randint(0, band_pass_filter.shape[0] - A)
-            A0 = int(torch.randint(0, band_pass_filter.shape[0] - A, (1,)).item())
-            band_pass_filter[A0:A0 + A, :] = 0
-        else:
-            band_pass_filter = band_pass_filter
-
-        self.filters = (band_pass_filter).view(self.out_channels, 1,
-                                               self.kernel_size)
+            A0 = int(torch.randint(0, max(1, filters.shape[0] - A), (1,)).item())
+            # Apply mask to local filters copy
+            filters[A0:A0 + A, :] = 0
 
         return F.conv1d(x,
-                        self.filters,
+                        filters,
                         stride=self.stride,
                         padding=self.padding,
                         dilation=self.dilation,
@@ -621,6 +621,35 @@ class Model(nn.Module):
 #         "pool_ratios": [0.5, 0.7, 0.5, 0.5],
 #         "temperatures": [2.0, 2.0, 100.0, 100.0]
 #     })
-#     # Torchscript
-#     model_scripted = torch.jit.script(model)
+    
+#     # Test forward pass first
+#     example_input = torch.randn(1, 64600)
+#     print("Testing forward pass...")
+#     with torch.no_grad():
+#         output = model(example_input, Freq_aug=False)
+#     print(f"Forward pass successful. Output: {output}")
+    
+#     # Create a wrapper for tracing without boolean parameter
+#     class ModelWrapper(nn.Module):
+#         def __init__(self, model):
+#             super().__init__()
+#             self.model = model
+            
+#         def forward(self, x):
+#             return self.model(x, Freq_aug=False)
+    
+#     print("Creating TorchScript model using trace...")
+#     model.eval()  # Set to eval mode for tracing
+#     #wrapper = ModelWrapper(model)
+#     model_scripted = torch.jit.trace(model, example_input)
+#     print("TorchScript trace creation successful")
+    
+#     print("Testing traced model...")
+#     scripted_output = model_scripted(example_input)
+#     print(f"Traced model test successful")
+    
+#     # Save the model
+#     print("Saving model...")
+#     model_scripted.save("AASIST.pt")
+#     print("Model saved successfully!")
     

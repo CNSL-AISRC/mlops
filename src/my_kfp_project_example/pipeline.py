@@ -5,7 +5,7 @@ from components.download_data import download_data
 from components.preprocess_data import preprocess_data
 from components.train_model_comp.train_model import train_model
 from components.evaluate_model import evaluate_model
-from components.serving_comp.serving_comp import serving_comp
+from components.serving_comp import serving_comp
 from dotenv import load_dotenv
 from kfp_manager import KFPClientManager
 import os
@@ -50,12 +50,27 @@ def my_pipeline():
     k8s.mount_pvc(step4, pvc_name=pvc1.outputs['name'], mount_path=os.getenv('PVC_MOUNT_PATH'))
     
     # Step 5: Serving model
+    print(f"isvc_name: {os.getenv('ISVC_NAME')}")
+    # import sys
+    # sys.exit()
     step5 = serving_comp(model_uri=step4.output, isvc_name=os.getenv("ISVC_NAME"))
     step5.set_gpu_limit(1) # set gpu limit to 1
+    step5.set_env_variable(name="MLFLOW_TRACKING_URI", value=os.getenv("MLFLOW_TRACKING_URI"))
+    step5.set_env_variable(name="MLFLOW_S3_ENDPOINT_URL", value=os.getenv("MLFLOW_S3_ENDPOINT_URL"))
     step5.set_env_variable(name="AWS_ACCESS_KEY_ID", value=os.getenv("AWS_ACCESS_KEY_ID"))
     step5.set_env_variable(name="AWS_SECRET_ACCESS_KEY", value=os.getenv("AWS_SECRET_ACCESS_KEY"))
+    step5.set_env_variable(name="PRIVATE_DOCKER_REGISTRY", value=os.getenv("PRIVATE_DOCKER_REGISTRY"))
+    step5.set_env_variable(name="SERVING_MODEL_VERSION", value=os.getenv("SERVING_MODEL_VERSION"))
+    
+    # Allocate resources for step5
+    step5.set_cpu_request("4")
+    step5.set_cpu_limit("8")
+    step5.set_memory_request('4Gi')
+    step5.set_memory_limit('8Gi')
+
 
     
+    step5.set_caching_options(False) # disable caching
     
     # Step 5: Deploy model
     # TODO: Implement this step

@@ -103,6 +103,10 @@ components:
           parameterType: STRING
         model_uri:
           parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
   comp-train-model:
     executorLabel: exec-train-model
     inputDefinitions:
@@ -260,21 +264,102 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kserve==0.13.1'\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'kserve==0.13.1'\
           \ 'kubernetes==26.1.0' 'tenacity==9.0.0' 'dotenv' && \"$0\" \"$@\"\n"
-        - python3
-        - -m
-        - kfp.dsl.executor_main
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef serving_comp(model_uri: str, isvc_name: str) -> str:\n    from\
+          \ kubernetes.client import V1ObjectMeta\n    from kserve import (\n    \
+          \    constants,\n        KServeClient,\n        V1beta1InferenceService,\n\
+          \        V1beta1InferenceServiceSpec,\n        V1beta1PredictorSpec,\n \
+          \       V1beta1TorchServeSpec,\n        V1beta1ModelSpec,\n    )\n    from\
+          \ tenacity import retry, wait_exponential, stop_after_attempt\n    import\
+          \ os\n    #     # # Create InferenceService with custom predictor\n    print(f\"\
+          isvc_name: {isvc_name}\")\n    print(f\"model_uri: {model_uri}\")\n    #print(f\"\
+          os.getenv('PRIVATE_DOCKER_REGISTRY'): {os.getenv('PRIVATE_DOCKER_REGISTRY')}\"\
+          )\n    print(f\"os.getenv('SERVING_MODEL_VERSION'): {os.getenv('SERVING_MODEL_VERSION')}\"\
+          )\n    # print(f\"os.getenv('MLFLOW_TRACKING_URI'): {os.getenv('MLFLOW_TRACKING_URI')}\"\
+          )\n    # print(f\"os.getenv('MLFLOW_S3_ENDPOINT_URL'): {os.getenv('MLFLOW_S3_ENDPOINT_URL')}\"\
+          )\n    # print(f\"os.getenv('AWS_ACCESS_KEY_ID'): {os.getenv('AWS_ACCESS_KEY_ID')}\"\
+          )\n    isvc = V1beta1InferenceService(\n        api_version=constants.KSERVE_V1BETA1,\n\
+          \        kind=constants.KSERVE_KIND,\n        metadata=V1ObjectMeta(\n \
+          \           name=isvc_name,\n            annotations={\"sidecar.istio.io/inject\"\
+          : \"false\"},\n        ),\n        spec=V1beta1InferenceServiceSpec(\n \
+          \           predictor=V1beta1PredictorSpec(\n                service_account_name=\"\
+          kserve-controller-s3\",\n                # Use the pre-built custom image\
+          \ that contains your ModelWrapper\n                containers=[{\n     \
+          \               \"name\": \"kserve-container\",\n                    \"\
+          image\": f'{os.getenv(\"PRIVATE_DOCKER_REGISTRY\")}/aasist-project/model-server:{os.getenv(\"\
+          SERVING_MODEL_VERSION\")}',\n                    \"env\": [\n          \
+          \              {\"name\": \"MODEL_URI\", \"value\": model_uri},\n      \
+          \                  {\"name\": \"MODEL_NAME\", \"value\": isvc_name},\n \
+          \                       {\"name\": \"MLFLOW_TRACKING_URI\", \"value\": os.getenv(\"\
+          MLFLOW_TRACKING_URI\", \"\")},\n                        {\"name\": \"MLFLOW_S3_ENDPOINT_URL\"\
+          , \"value\": os.getenv(\"MLFLOW_S3_ENDPOINT_URL\", \"\")},\n           \
+          \             {\"name\": \"AWS_ACCESS_KEY_ID\", \"value\": os.getenv(\"\
+          AWS_ACCESS_KEY_ID\", \"\")},\n                        {\"name\": \"AWS_SECRET_ACCESS_KEY\"\
+          , \"value\": os.getenv(\"AWS_SECRET_ACCESS_KEY\", \"\")},\n            \
+          \        ]\n                }]\n            )\n        )\n    )\n    client\
+          \ = KServeClient()\n    try:\n        existing_isvc = client.get(isvc_name)\n\
+          \        if existing_isvc:\n            print(f\"Deleting existing InferenceService:\
+          \ {isvc_name}\")\n            client.delete(isvc_name)\n\n            #\
+          \ Wait for deletion to complete\n            @retry(\n                wait=wait_exponential(multiplier=2,\
+          \ min=1, max=10),\n                stop=stop_after_attempt(30),\n      \
+          \          reraise=True,\n            )\n            def wait_for_deletion(client,\
+          \ isvc_name):\n                try:\n                    client.get(isvc_name)\n\
+          \                    raise Exception(f\"InferenceService {isvc_name} still\
+          \ exists\")\n                except Exception as e:\n                  \
+          \  if \"not found\" in str(e).lower():\n                        return True\n\
+          \                    raise e\n\n            wait_for_deletion(client, isvc_name)\n\
+          \            print(f\"Successfully deleted existing InferenceService: {isvc_name}\"\
+          )\n    except Exception as e:\n        if \"not found\" not in str(e).lower():\n\
+          \            print(f\"Error checking existing InferenceService: {e}\")\n\
+          \n    print(f\"Creating InferenceService: {isvc_name}\")\n    client.create(isvc)\n\
+          \n    # Wait for the service to be ready with retry logic\n    @retry(\n\
+          \        wait=wait_exponential(multiplier=2, min=1, max=10),\n        stop=stop_after_attempt(100),\n\
+          \        reraise=True,\n    )\n    def assert_isvc_created(client, isvc_name):\n\
+          \        assert client.is_isvc_ready(isvc_name), f\"Failed to create Inference\
+          \ Service {isvc_name}.\"\n\n    assert_isvc_created(client, isvc_name)\n\
+          \n    # Get the service URL\n    isvc_resp = client.get(isvc_name)\n   \
+          \ isvc_url = isvc_resp['status']['address']['url']\n    print(f\"\u2705\
+          \ InferenceService URL: {isvc_url}\")\n\n    return isvc_url\n\n"
         env:
+        - name: MLFLOW_TRACKING_URI
+          value: http://mlflow-server.kubeflow.svc.cluster.local:5000
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://mlflow-minio.kubeflow:9000
         - name: AWS_ACCESS_KEY_ID
           value: minio
         - name: AWS_SECRET_ACCESS_KEY
           value: TQO113A0RSZIY2JESIOO85CUNVTPUC
-        image: 10.5.110.131:32000/aasist-project/serving-model:v1.0.0-002
+        - name: PRIVATE_DOCKER_REGISTRY
+          value: 10.5.110.131:32000
+        - name: SERVING_MODEL_VERSION
+          value: v1.0.0-008-debug-3
+        image: python:3.11
         resources:
           accelerator:
             count: '1'
             resourceCount: '1'
+          cpuLimit: 4.0
+          cpuRequest: 4.0
+          memoryLimit: 4.294967296
+          memoryRequest: 4.294967296
+          resourceCpuLimit: '4'
+          resourceCpuRequest: '4'
+          resourceMemoryLimit: 4Gi
+          resourceMemoryRequest: 4Gi
     exec-train-model:
       container:
         args:
@@ -308,7 +393,7 @@ deploymentSpec:
           value: AASIST_LA19
         - name: MLFLOW_MODEL_NAME
           value: AASIST
-        image: 10.5.110.131:32000/aasist-project/train-model:v1.0.0-037
+        image: 10.5.110.131:32000/aasist-project/train-model:v1.0.0-043-debug
         resources:
           accelerator:
             count: '1'
@@ -391,8 +476,7 @@ root:
         taskInfo:
           name: preprocess-data
       serving-comp:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-serving-comp
         dependentTasks:
@@ -401,7 +485,7 @@ root:
           parameters:
             isvc_name:
               runtimeValue:
-                constant: aasist-serving-test-debug-002
+                constant: aasist-serving-v1
             model_uri:
               taskOutputParameter:
                 outputParameterKey: Output
