@@ -1,0 +1,71 @@
+# PIPELINE DEFINITION
+# Name: download-dataset
+# Inputs:
+#    dataset_url: str
+# Outputs:
+#    Output: str
+components:
+  comp-download-dataset:
+    executorLabel: exec-download-dataset
+    inputDefinitions:
+      parameters:
+        dataset_url:
+          description: URL to download the dataset from
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-download-dataset:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - download_dataset
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'requests==2.32.4'\
+          \ 'python-dotenv==1.1.1' 'tqdm==4.67.1' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: 10.5.110.131:32000/aasist-project/download-dataset:v1.0.0-004
+pipelineInfo:
+  name: download-dataset
+root:
+  dag:
+    outputs:
+      parameters:
+        Output:
+          valueFromParameter:
+            outputParameterKey: Output
+            producerSubtask: download-dataset
+    tasks:
+      download-dataset:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-download-dataset
+        inputs:
+          parameters:
+            dataset_url:
+              componentInputParameter: dataset_url
+        taskInfo:
+          name: download-dataset
+  inputDefinitions:
+    parameters:
+      dataset_url:
+        description: URL to download the dataset from
+        parameterType: STRING
+  outputDefinitions:
+    parameters:
+      Output:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0

@@ -1,13 +1,11 @@
-import kfp
-import mlflow
 import os
 import requests
-
+from kfp_manager import KFPClientManager
+from dotenv import load_dotenv
 from kfp.dsl import Input, Model, component
 from kfp.dsl import InputPath, OutputPath, pipeline, component
-from kserve import KServeClient
-from mlflow.tracking import MlflowClient
-from tenacity import retry, stop_after_attempt, wait_exponential
+import kfp
+load_dotenv()
 
 @component(
     base_image="python:3.11",
@@ -121,7 +119,7 @@ def deploy_model_with_kserve(model_uri: str, isvc_name: str) -> str:
     
     return isvc_url
 
-ISVC_NAME = "wine-regressor8"
+ISVC_NAME = "wine-regressor228"
 MLFLOW_RUN_NAME = "elastic_net_models_vscode"
 MLFLOW_MODEL_NAME = "wine-elasticnet"
 
@@ -134,8 +132,8 @@ print(aws_access_key_id)
 aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
 print(aws_secret_access_key)
 
-import sys
-sys.exit(1)
+# import sys
+# sys.exit(1)
 
 @pipeline(name='download-preprocess-train-deploy-pipeline')
 def download_preprocess_train_deploy_pipeline(url: str):
@@ -156,10 +154,17 @@ def download_preprocess_train_deploy_pipeline(url: str):
         model_uri=train_task.output, isvc_name=ISVC_NAME
     ).set_env_variable(name='AWS_SECRET_ACCESS_KEY', value=aws_secret_access_key)
 
-client = kfp.Client()
+kfp_client_manager = KFPClientManager(
+        api_url=os.getenv("KFP_API_URL"),
+        skip_tls_verify=os.getenv("KFP_SKIP_TLS_VERIFY", "true").lower() == "true",
+        dex_username=os.getenv("DEX_USERNAME"),
+        dex_password=os.getenv("DEX_PASSWORD"),
+        dex_auth_type=os.getenv("DEX_AUTH_TYPE", "local"),
+    )
+kfp_client = kfp_client_manager.create_kfp_client()
 
 url = 'https://raw.githubusercontent.com/canonical/kubeflow-examples/main/e2e-wine-kfp-mlflow/winequality-red.csv'
 
 kfp.compiler.Compiler().compile(download_preprocess_train_deploy_pipeline, 'download_preprocess_train_deploy_pipeline.yaml')
 
-run = client.create_run_from_pipeline_func(download_preprocess_train_deploy_pipeline, arguments={'url': url}, enable_caching=False)
+run = kfp_client.create_run_from_pipeline_func(download_preprocess_train_deploy_pipeline, arguments={'url': url}, enable_caching=False, namespace=os.getenv("KFP_NAMESPACE"))

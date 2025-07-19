@@ -1,0 +1,476 @@
+# PIPELINE DEFINITION
+# Name: aasist-demo-pipeline
+# Description: A simple Kubeflow pipeline example
+components:
+  comp-createpvc:
+    executorLabel: exec-createpvc
+    inputDefinitions:
+      parameters:
+        access_modes:
+          description: 'AccessModes to request for the provisioned PVC. May
+
+            be one or more of ``''ReadWriteOnce''``, ``''ReadOnlyMany''``, ``''ReadWriteMany''``,
+            or
+
+            ``''ReadWriteOncePod''``. Corresponds to `PersistentVolumeClaim.spec.accessModes
+            <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes>`_.'
+          parameterType: LIST
+        annotations:
+          description: Annotations for the PVC's metadata. Corresponds to `PersistentVolumeClaim.metadata.annotations
+            <https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#PersistentVolumeClaim>`_.
+          isOptional: true
+          parameterType: STRUCT
+        pvc_name:
+          description: 'Name of the PVC. Corresponds to `PersistentVolumeClaim.metadata.name
+            <https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#PersistentVolumeClaim>`_.
+            Only one of ``pvc_name`` and ``pvc_name_suffix`` can
+
+            be provided.'
+          isOptional: true
+          parameterType: STRING
+        pvc_name_suffix:
+          description: 'Prefix to use for a dynamically generated name, which
+
+            will take the form ``<argo-workflow-name>-<pvc_name_suffix>``. Only one
+
+            of ``pvc_name`` and ``pvc_name_suffix`` can be provided.'
+          isOptional: true
+          parameterType: STRING
+        size:
+          description: The size of storage requested by the PVC that will be provisioned.
+            For example, ``'5Gi'``. Corresponds to `PersistentVolumeClaim.spec.resources.requests.storage
+            <https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#PersistentVolumeClaimSpec>`_.
+          parameterType: STRING
+        storage_class_name:
+          defaultValue: ''
+          description: 'Name of StorageClass from which to provision the PV
+
+            to back the PVC. ``None`` indicates to use the cluster''s default
+
+            storage_class_name. Set to ``''''`` for a statically specified PVC.'
+          isOptional: true
+          parameterType: STRING
+        volume_name:
+          description: 'Pre-existing PersistentVolume that should back the
+
+            provisioned PersistentVolumeClaim. Used for statically
+
+            specified PV only. Corresponds to `PersistentVolumeClaim.spec.volumeName
+            <https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#PersistentVolumeClaimSpec>`_.'
+          isOptional: true
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        name:
+          parameterType: STRING
+  comp-download-data:
+    executorLabel: exec-download-data
+    inputDefinitions:
+      parameters:
+        dataset_url:
+          parameterType: STRING
+        pvc_path:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-evaluate-model:
+    executorLabel: exec-evaluate-model
+    inputDefinitions:
+      parameters:
+        model:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-preprocess-data:
+    executorLabel: exec-preprocess-data
+    inputDefinitions:
+      parameters:
+        zip_file_path:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-serving-comp:
+    executorLabel: exec-serving-comp
+    inputDefinitions:
+      parameters:
+        isvc_name:
+          parameterType: STRING
+        model_uri:
+          parameterType: STRING
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      parameters:
+        config:
+          parameterType: STRING
+        processed_data:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-createpvc:
+      container:
+        image: argostub/createpvc
+    exec-download-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - download_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'requests==2.32.4'\
+          \ 'tqdm==4.67.1' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef download_data(\n    dataset_url: str,\n    pvc_path: str\n  \
+          \  ) -> str:\n    # print(f\"Downloading data from {dataset_url}\")\n  \
+          \  # return dataset_url\n    import requests\n    import os\n    from tqdm\
+          \ import tqdm\n    from urllib.parse import urlparse\n\n    # Extract filename\
+          \ from URL\n    parsed_url = urlparse(dataset_url)\n    filename = os.path.basename(parsed_url.path)\n\
+          \    dst_path = os.path.join(pvc_path, filename)\n    # Check if filename\
+          \ is exists in the pvc path\n    if os.path.exists(os.path.join(pvc_path,\
+          \ filename)):\n        print(f\"Dataset already exists in {pvc_path}\")\n\
+          \        return dst_path\n\n    print(f\"Downloading dataset from: {dataset_url}\"\
+          )\n    print(f\"Saving to: {dst_path}\")\n\n    # Create directory if it\
+          \ doesn't exist\n    os.makedirs(pvc_path, exist_ok=True)\n\n    # Download\
+          \ with progress bar\n    response = requests.get(dataset_url, stream=True)\n\
+          \    response.raise_for_status()\n\n    total_size = int(response.headers.get('content-length',\
+          \ 0))\n\n    with open(dst_path, 'wb') as file, tqdm(\n        desc=filename,\n\
+          \        total=total_size,\n        unit='B',\n        unit_scale=True,\n\
+          \        unit_divisor=1024,\n    ) as pbar:\n        for chunk in response.iter_content(chunk_size=8192):\n\
+          \            if chunk:\n                file.write(chunk)\n            \
+          \    pbar.update(len(chunk))\n\n    print(f\"Dataset downloaded successfully\
+          \ to {dst_path}\")\n    return dst_path \n\n"
+        image: python:3.9
+    exec-evaluate-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_model(model: str) -> str:\n    accuracy = 0.95  # Fake\
+          \ accuracy\n    print(f\"Evaluating {model}, got accuracy={accuracy}\")\n\
+          \    return model\n\n"
+        image: python:3.9
+    exec-preprocess-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocess_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocess_data(zip_file_path: str) -> str:\n    # cleaned =\
+          \ raw_data.upper()  # Dummy processing\n    # print(\"Cleaned:\", cleaned)\n\
+          \    import zipfile\n    import os\n    from pathlib import Path\n\n   \
+          \ # Check if extraction_dir is exists in the pvc path\n    extraction_dir\
+          \ = os.path.join(os.path.dirname(zip_file_path), \"src\")\n        # Create\
+          \ extraction directory\n    os.makedirs(extraction_dir, exist_ok=True)\n\
+          \    # if extraction_dir is empty \n    if not os.listdir(extraction_dir):\n\
+          \        print(f\"Extraction directory is empty\")\n        print(f\"Extracting\
+          \ dataset from: {zip_file_path}\")\n        print(f\"Extraction directory:\
+          \ {extraction_dir}\")\n\n        # Extract the zip file\n        try:\n\
+          \            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:\n    \
+          \            zip_ref.extractall(extraction_dir)\n\n            print(\"\
+          Dataset extracted successfully!\")\n\n            # List extracted contents\n\
+          \            print(\"Extracted contents:\")\n            for root, dirs,\
+          \ files in os.walk(extraction_dir):\n                level = root.replace(extraction_dir,\
+          \ '').count(os.sep)\n                indent = ' ' * 2 * level\n        \
+          \        print(f\"{indent}{os.path.basename(root)}/\")\n               \
+          \ subindent = ' ' * 2 * (level + 1)\n                for file in files[:5]:\
+          \  # Show first 5 files only\n                    print(f\"{subindent}{file}\"\
+          )\n                if len(files) > 5:\n                    print(f\"{subindent}...\
+          \ and {len(files) - 5} more files\")\n\n            return extraction_dir\n\
+          \n        except Exception as e:\n            print(f\"Error extracting\
+          \ dataset: {e}\")\n            raise e \n    else:\n        print(f\"Extraction\
+          \ directory is not empty\")\n        return extraction_dir\n\n"
+        image: python:3.9
+    exec-serving-comp:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - serving_comp
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kserve==0.13.1'\
+          \ 'kubernetes==26.1.0' 'tenacity==9.0.0' 'dotenv' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          value: minio
+        - name: AWS_SECRET_ACCESS_KEY
+          value: TQO113A0RSZIY2JESIOO85CUNVTPUC
+        image: 10.5.110.131:32000/aasist-project/serving-model:v1.0.0-002
+        resources:
+          accelerator:
+            count: '1'
+            resourceCount: '1'
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'torchcontrib==0.0.2'\
+          \ 'soundfile==0.13.1' 'tensorboard==2.19.0' 'tqdm==4.67.1' 'mlflow==2.20'\
+          \ 'boto3==1.37.1' 'dotenv' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        env:
+        - name: MLFLOW_TRACKING_URI
+          value: http://mlflow-server.kubeflow.svc.cluster.local:5000
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://mlflow-minio.kubeflow:9000
+        - name: AWS_ACCESS_KEY_ID
+          value: minio
+        - name: AWS_SECRET_ACCESS_KEY
+          value: TQO113A0RSZIY2JESIOO85CUNVTPUC
+        - name: MLFLOW_RUN_NAME
+          value: AASIST_0.1_1e
+        - name: MLFLOW_EXPERIMENT_NAME
+          value: AASIST_LA19
+        - name: MLFLOW_MODEL_NAME
+          value: AASIST
+        image: 10.5.110.131:32000/aasist-project/train-model:v1.0.0-037
+        resources:
+          accelerator:
+            count: '1'
+            resourceCount: '1'
+pipelineInfo:
+  description: A simple Kubeflow pipeline example
+  name: aasist-demo-pipeline
+root:
+  dag:
+    tasks:
+      createpvc:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-createpvc
+        inputs:
+          parameters:
+            access_modes:
+              runtimeValue:
+                constant:
+                - ReadWriteMany
+            pvc_name:
+              runtimeValue:
+                constant: aasist-demo-pvc
+            size:
+              runtimeValue:
+                constant: 20Gi
+            storage_class_name:
+              runtimeValue:
+                constant: microk8s-hostpath
+        taskInfo:
+          name: createpvc
+      download-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-download-data
+        dependentTasks:
+        - createpvc
+        inputs:
+          parameters:
+            dataset_url:
+              runtimeValue:
+                constant: http://10.5.110.131:28080/LA.zip
+            pvc_path:
+              runtimeValue:
+                constant: /mnt
+        taskInfo:
+          name: download-data
+      evaluate-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-model
+        dependentTasks:
+        - createpvc
+        - train-model
+        inputs:
+          parameters:
+            model:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-model
+        taskInfo:
+          name: evaluate-model
+      preprocess-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-preprocess-data
+        dependentTasks:
+        - createpvc
+        - download-data
+        inputs:
+          parameters:
+            zip_file_path:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: download-data
+        taskInfo:
+          name: preprocess-data
+      serving-comp:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-serving-comp
+        dependentTasks:
+        - evaluate-model
+        inputs:
+          parameters:
+            isvc_name:
+              runtimeValue:
+                constant: aasist-serving-test-debug-002
+            model_uri:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: evaluate-model
+        taskInfo:
+          name: serving-comp
+      train-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model
+        dependentTasks:
+        - createpvc
+        - preprocess-data
+        inputs:
+          parameters:
+            config:
+              runtimeValue:
+                constant: config/AASIST.conf
+            processed_data:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: preprocess-data
+        taskInfo:
+          name: train-model
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0
+---
+platforms:
+  kubernetes:
+    deploymentSpec:
+      executors:
+        exec-download-data:
+          pvcMount:
+          - mountPath: /mnt
+            pvcNameParameter:
+              taskOutputParameter:
+                outputParameterKey: name
+                producerTask: createpvc
+            taskOutputParameter:
+              outputParameterKey: name
+              producerTask: createpvc
+        exec-evaluate-model:
+          pvcMount:
+          - mountPath: /mnt
+            pvcNameParameter:
+              taskOutputParameter:
+                outputParameterKey: name
+                producerTask: createpvc
+            taskOutputParameter:
+              outputParameterKey: name
+              producerTask: createpvc
+        exec-preprocess-data:
+          pvcMount:
+          - mountPath: /mnt
+            pvcNameParameter:
+              taskOutputParameter:
+                outputParameterKey: name
+                producerTask: createpvc
+            taskOutputParameter:
+              outputParameterKey: name
+              producerTask: createpvc
+        exec-train-model:
+          pvcMount:
+          - mountPath: /mnt
+            pvcNameParameter:
+              taskOutputParameter:
+                outputParameterKey: name
+                producerTask: createpvc
+            taskOutputParameter:
+              outputParameterKey: name
+              producerTask: createpvc

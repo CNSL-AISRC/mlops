@@ -1,0 +1,113 @@
+# PIPELINE DEFINITION
+# Name: test2
+# Description: End-to-end pipeline for training and deploying AASIST anti-spoofing models
+# Inputs:
+#    config_json: str [Default: '']
+#    device: str [Default: 'cuda']
+components:
+  comp-download-dataset:
+    executorLabel: exec-download-dataset
+    inputDefinitions:
+      parameters:
+        dataset_url:
+          defaultValue: http://10.5.110.131:8080/test.zip
+          isOptional: true
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-extract-dataset:
+    executorLabel: exec-extract-dataset
+    inputDefinitions:
+      parameters:
+        zip_file_path:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-download-dataset:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - download_dataset
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'requests==2.32.4'\
+          \ 'python-dotenv==1.1.1' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: 10.5.110.131:32000/aasist-project/download-dataset:v1.0.0-15
+    exec-extract-dataset:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - extract_dataset
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'python-dotenv==1.1.1'\
+          \ && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: 10.5.110.131:32000/aasist-project/extract-dataset:v1.0.0-12
+pipelineInfo:
+  description: End-to-end pipeline for training and deploying AASIST anti-spoofing
+    models
+  name: test2
+root:
+  dag:
+    tasks:
+      download-dataset:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-download-dataset
+        inputs:
+          parameters:
+            dataset_url:
+              runtimeValue:
+                constant: http://10.5.110.131:8080/test.zip
+        taskInfo:
+          name: Download Dataset
+      extract-dataset:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-extract-dataset
+        dependentTasks:
+        - download-dataset
+        inputs:
+          parameters:
+            zip_file_path:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: download-dataset
+        taskInfo:
+          name: Extract & Validate Dataset
+  inputDefinitions:
+    parameters:
+      config_json:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      device:
+        defaultValue: cuda
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0

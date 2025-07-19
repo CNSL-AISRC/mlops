@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registry-ui
+  template:
+    metadata:
+      labels:
+        app: registry-ui
+    spec:
+      containers:
+        - name: registry-ui
+          image: joxit/docker-registry-ui:latest
+          ports:
+            - containerPort: 80
+          env:
+            - name: REGISTRY_TITLE
+              value: "My Private Registry"
+            - name: REGISTRY_URL
+              value: "http://10.5.110.131:32000"  # service name in cluster
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-ui
+spec:
+  selector:
+    app: registry-ui
+  ports:
+    - port: 80
+      targetPort: 80
+  type: NodePort  # or LoadBalancer/Ingress if needed

@@ -1,0 +1,60 @@
+# PIPELINE DEFINITION
+# Name: serving-comp
+# Inputs:
+#    isvc_name: str
+#    model_uri: str
+components:
+  comp-serving-comp:
+    executorLabel: exec-serving-comp
+    inputDefinitions:
+      parameters:
+        isvc_name:
+          parameterType: STRING
+        model_uri:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-serving-comp:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - serving_comp
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kserve==0.13.1'\
+          \ 'kubernetes==26.1.0' 'tenacity==9.0.0' 'dotenv' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: 10.5.110.131:32000/aasist-project/serving-model:v1.0.0-002
+pipelineInfo:
+  name: serving-comp
+root:
+  dag:
+    tasks:
+      serving-comp:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-serving-comp
+        inputs:
+          parameters:
+            isvc_name:
+              componentInputParameter: isvc_name
+            model_uri:
+              componentInputParameter: model_uri
+        taskInfo:
+          name: serving-comp
+  inputDefinitions:
+    parameters:
+      isvc_name:
+        parameterType: STRING
+      model_uri:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0

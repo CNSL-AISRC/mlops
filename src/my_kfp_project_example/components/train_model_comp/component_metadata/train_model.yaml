@@ -1,0 +1,77 @@
+# PIPELINE DEFINITION
+# Name: train-model
+# Inputs:
+#    config: str
+#    processed_data: str
+# Outputs:
+#    Output: str
+components:
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      parameters:
+        config:
+          parameterType: STRING
+        processed_data:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'torchcontrib==0.0.2'\
+          \ 'soundfile==0.13.1' 'tensorboard==2.19.0' 'tqdm==4.67.1' 'mlflow==2.20'\
+          \ 'boto3==1.37.1' 'dotenv' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: 10.5.110.131:32000/aasist-project/train-model:v1.0.0-037
+pipelineInfo:
+  name: train-model
+root:
+  dag:
+    outputs:
+      parameters:
+        Output:
+          valueFromParameter:
+            outputParameterKey: Output
+            producerSubtask: train-model
+    tasks:
+      train-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model
+        inputs:
+          parameters:
+            config:
+              componentInputParameter: config
+            processed_data:
+              componentInputParameter: processed_data
+        taskInfo:
+          name: train-model
+  inputDefinitions:
+    parameters:
+      config:
+        parameterType: STRING
+      processed_data:
+        parameterType: STRING
+  outputDefinitions:
+    parameters:
+      Output:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0
