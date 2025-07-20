@@ -310,11 +310,22 @@ deploymentSpec:
           \             {\"name\": \"AWS_ACCESS_KEY_ID\", \"value\": os.getenv(\"\
           AWS_ACCESS_KEY_ID\", \"\")},\n                        {\"name\": \"AWS_SECRET_ACCESS_KEY\"\
           , \"value\": os.getenv(\"AWS_SECRET_ACCESS_KEY\", \"\")},\n            \
-          \        ]\n                }]\n            )\n        )\n    )\n    client\
-          \ = KServeClient()\n    try:\n        existing_isvc = client.get(isvc_name)\n\
-          \        if existing_isvc:\n            print(f\"Deleting existing InferenceService:\
-          \ {isvc_name}\")\n            client.delete(isvc_name)\n\n            #\
-          \ Wait for deletion to complete\n            @retry(\n                wait=wait_exponential(multiplier=2,\
+          \        ],\n                    \"resources\": {\n                    \
+          \    \"requests\": {\n                            \"cpu\": \"4\",\n    \
+          \                        \"memory\": \"8Gi\"\n                        },\n\
+          \                        \"limits\": {\n                            \"cpu\"\
+          : \"4\",\n                            \"memory\": \"16Gi\"\n           \
+          \             },\n                        # add gpu request and limit\n\
+          \                        \"gpu\": {\n                            \"requests\"\
+          : {\n                                \"nvidia.com/gpu\": \"1\"\n       \
+          \                     },\n                            \"limits\": {\n  \
+          \                              \"nvidia.com/gpu\": \"1\"\n             \
+          \               }\n                        }\n                    }\n  \
+          \              }]\n            )\n        )\n    )\n    client = KServeClient()\n\
+          \    try:\n        existing_isvc = client.get(isvc_name)\n        if existing_isvc:\n\
+          \            print(f\"Deleting existing InferenceService: {isvc_name}\"\
+          )\n            client.delete(isvc_name)\n\n            # Wait for deletion\
+          \ to complete\n            @retry(\n                wait=wait_exponential(multiplier=2,\
           \ min=1, max=10),\n                stop=stop_after_attempt(30),\n      \
           \          reraise=True,\n            )\n            def wait_for_deletion(client,\
           \ isvc_name):\n                try:\n                    client.get(isvc_name)\n\
@@ -344,22 +355,14 @@ deploymentSpec:
         - name: AWS_SECRET_ACCESS_KEY
           value: TQO113A0RSZIY2JESIOO85CUNVTPUC
         - name: PRIVATE_DOCKER_REGISTRY
-          value: 10.5.110.131:32000
+          value: ghcr.io/cnsl-aisrc
         - name: SERVING_MODEL_VERSION
-          value: v1.0.0-008-debug-3
+          value: v1.0.2
         image: python:3.11
         resources:
           accelerator:
             count: '1'
             resourceCount: '1'
-          cpuLimit: 4.0
-          cpuRequest: 4.0
-          memoryLimit: 4.294967296
-          memoryRequest: 4.294967296
-          resourceCpuLimit: '4'
-          resourceCpuRequest: '4'
-          resourceMemoryLimit: 4Gi
-          resourceMemoryRequest: 4Gi
     exec-train-model:
       container:
         args:
@@ -393,7 +396,7 @@ deploymentSpec:
           value: AASIST_LA19
         - name: MLFLOW_MODEL_NAME
           value: AASIST
-        image: 10.5.110.131:32000/aasist-project/train-model:v1.0.0-043-debug
+        image: ghcr.io/cnsl-aisrc/aasist-project/train-model:v1.0.0-043-debug
         resources:
           accelerator:
             count: '1'
@@ -476,7 +479,8 @@ root:
         taskInfo:
           name: preprocess-data
       serving-comp:
-        cachingOptions: {}
+        cachingOptions:
+          enableCache: true
         componentRef:
           name: comp-serving-comp
         dependentTasks:

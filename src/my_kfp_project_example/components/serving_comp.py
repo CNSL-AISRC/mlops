@@ -52,7 +52,26 @@ def serving_comp(model_uri: str, isvc_name: str) -> str:
                         {"name": "MLFLOW_S3_ENDPOINT_URL", "value": os.getenv("MLFLOW_S3_ENDPOINT_URL", "")},
                         {"name": "AWS_ACCESS_KEY_ID", "value": os.getenv("AWS_ACCESS_KEY_ID", "")},
                         {"name": "AWS_SECRET_ACCESS_KEY", "value": os.getenv("AWS_SECRET_ACCESS_KEY", "")},
-                    ]
+                    ],
+                    "resources": {
+                        "requests": {
+                            "cpu": "4",
+                            "memory": "8Gi"
+                        },
+                        "limits": {
+                            "cpu": "4",
+                            "memory": "16Gi"
+                        },
+                        # add gpu request and limit
+                        "gpu": {
+                            "requests": {
+                                "nvidia.com/gpu": "1"
+                            },
+                            "limits": {
+                                "nvidia.com/gpu": "1"
+                            }
+                        }
+                    }
                 }]
             )
         )

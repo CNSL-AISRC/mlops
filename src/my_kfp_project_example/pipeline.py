@@ -63,14 +63,14 @@ def my_pipeline():
     step5.set_env_variable(name="SERVING_MODEL_VERSION", value=os.getenv("SERVING_MODEL_VERSION"))
     
     # Allocate resources for step5
-    step5.set_cpu_request("4")
-    step5.set_cpu_limit("8")
-    step5.set_memory_request('4Gi')
-    step5.set_memory_limit('8Gi')
+    # step5.set_cpu_request("4")
+    # step5.set_cpu_limit("8")
+    # step5.set_memory_request('4Gi')
+    # step5.set_memory_limit('8Gi')
 
 
     
-    step5.set_caching_options(False) # disable caching
+    # step5.set_caching_options(False) # disable caching
     
     # Step 5: Deploy model
     # TODO: Implement this step
@@ -78,7 +78,7 @@ def my_pipeline():
 if __name__ == "__main__":
     compiler.Compiler().compile(
         pipeline_func=my_pipeline,
-        package_path=os.getenv("PIPELINE_PACKAGE_PATH")
+        package_path=os.getenv("PIPELINE_PACKAGE_PATH"),
     )
     kfp_client_manager = KFPClientManager(
         api_url=os.getenv("KFP_API_URL"),
@@ -88,12 +88,12 @@ if __name__ == "__main__":
         dex_auth_type=os.getenv("DEX_AUTH_TYPE", "local"),
     )
     kfp_client = kfp_client_manager.create_kfp_client()
-    
     run = kfp_client.create_run_from_pipeline_package(
         os.getenv("PIPELINE_PACKAGE_PATH"),
         arguments={},
         namespace=os.getenv("KFP_NAMESPACE"),
         experiment_name=os.getenv("KFP_EXPERIMENT_NAME"),
     )
+
     #print(f"Run ID: {run.id}")
     
