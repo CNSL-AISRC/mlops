@@ -186,6 +186,9 @@ class ModelWrapper(kserve.Model):
             
         except Exception as e:
             self.logger.error(f"Prediction failed: {e}")
+            if "CUDA out of memory" in str(e):
+                torch.cuda.empty_cache()
+                return {"error": "Input too large, please reduce input size"}
             # Cleanup on error
             if self.device.type == "cuda":
                 torch.cuda.empty_cache()

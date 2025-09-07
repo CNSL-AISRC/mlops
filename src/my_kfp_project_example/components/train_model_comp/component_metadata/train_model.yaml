@@ -38,7 +38,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: ghcr.io/cnsl-aisrc/aasist-project/train-model:v1.0.0-043-debug
+        image: ghcr.io/cnsl-aisrc/aasist-project/train-model:v1.0.2
 pipelineInfo:
   name: train-model
 root:

@@ -63,6 +63,14 @@ components:
       parameters:
         name:
           parameterType: STRING
+  comp-deletepvc:
+    executorLabel: exec-deletepvc
+    inputDefinitions:
+      parameters:
+        pvc_name:
+          description: Name of the PVC to delete. Supports passing a runtime-generated
+            name, such as a name provided by ``kubernetes.CreatePvcOp().outputs['name']``.
+          parameterType: STRING
   comp-download-data:
     executorLabel: exec-download-data
     inputDefinitions:
@@ -124,6 +132,9 @@ deploymentSpec:
     exec-createpvc:
       container:
         image: argostub/createpvc
+    exec-deletepvc:
+      container:
+        image: argostub/deletepvc
     exec-download-data:
       container:
         args:
@@ -280,8 +291,8 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef serving_comp(model_uri: str, isvc_name: str) -> str:\n    from\
-          \ kubernetes.client import V1ObjectMeta\n    from kserve import (\n    \
-          \    constants,\n        KServeClient,\n        V1beta1InferenceService,\n\
+          \ kubernetes.client import V1ObjectMeta, V1LocalObjectReference\n    from\
+          \ kserve import (\n        constants,\n        KServeClient,\n        V1beta1InferenceService,\n\
           \        V1beta1InferenceServiceSpec,\n        V1beta1PredictorSpec,\n \
           \       V1beta1TorchServeSpec,\n        V1beta1ModelSpec,\n    )\n    from\
           \ tenacity import retry, wait_exponential, stop_after_attempt\n    import\
@@ -320,9 +331,11 @@ deploymentSpec:
           : {\n                                \"nvidia.com/gpu\": \"1\"\n       \
           \                     },\n                            \"limits\": {\n  \
           \                              \"nvidia.com/gpu\": \"1\"\n             \
-          \               }\n                        }\n                    }\n  \
-          \              }]\n            )\n        )\n    )\n    client = KServeClient()\n\
-          \    try:\n        existing_isvc = client.get(isvc_name)\n        if existing_isvc:\n\
+          \               }\n                        }\n                    },\n \
+          \               }],\n                image_pull_secrets=[V1LocalObjectReference(name=os.getenv(\"\
+          IMAGE_PULL_SECRET_NAME\"))],\n                restart_policy=\"Always\"\n\
+          \            )\n        )\n    )\n    client = KServeClient()\n    try:\n\
+          \        existing_isvc = client.get(isvc_name)\n        if existing_isvc:\n\
           \            print(f\"Deleting existing InferenceService: {isvc_name}\"\
           )\n            client.delete(isvc_name)\n\n            # Wait for deletion\
           \ to complete\n            @retry(\n                wait=wait_exponential(multiplier=2,\
@@ -353,11 +366,13 @@ deploymentSpec:
         - name: AWS_ACCESS_KEY_ID
           value: minio
         - name: AWS_SECRET_ACCESS_KEY
-          value: TQO113A0RSZIY2JESIOO85CUNVTPUC
+          value: XCC3JDJWS5IPZTZBRXRMPVD5J8H1WC
         - name: PRIVATE_DOCKER_REGISTRY
           value: ghcr.io/cnsl-aisrc
         - name: SERVING_MODEL_VERSION
-          value: v1.0.2
+          value: v1.0.4
+        - name: IMAGE_PULL_SECRET_NAME
+          value: ghcr-secret
         image: python:3.11
         resources:
           accelerator:
@@ -389,14 +404,14 @@ deploymentSpec:
         - name: AWS_ACCESS_KEY_ID
           value: minio
         - name: AWS_SECRET_ACCESS_KEY
-          value: TQO113A0RSZIY2JESIOO85CUNVTPUC
+          value: XCC3JDJWS5IPZTZBRXRMPVD5J8H1WC
         - name: MLFLOW_RUN_NAME
           value: AASIST_0.1_1e
         - name: MLFLOW_EXPERIMENT_NAME
           value: AASIST_LA19
         - name: MLFLOW_MODEL_NAME
           value: AASIST
-        image: ghcr.io/cnsl-aisrc/aasist-project/train-model:v1.0.0-043-debug
+        image: ghcr.io/cnsl-aisrc/aasist-project/train-model:v1.0.2
         resources:
           accelerator:
             count: '1'
@@ -418,9 +433,9 @@ root:
               runtimeValue:
                 constant:
                 - ReadWriteMany
-            pvc_name:
+            pvc_name_suffix:
               runtimeValue:
-                constant: aasist-demo-pvc
+                constant: -demo-pvc
             size:
               runtimeValue:
                 constant: 20Gi
@@ -429,9 +444,24 @@ root:
                 constant: microk8s-hostpath
         taskInfo:
           name: createpvc
-      download-data:
+      deletepvc:
         cachingOptions:
           enableCache: true
+        componentRef:
+          name: comp-deletepvc
+        dependentTasks:
+        - createpvc
+        - serving-comp
+        inputs:
+          parameters:
+            pvc_name:
+              taskOutputParameter:
+                outputParameterKey: name
+                producerTask: createpvc
+        taskInfo:
+          name: deletepvc
+      download-data:
+        cachingOptions: {}
         componentRef:
           name: comp-download-data
         dependentTasks:
@@ -443,7 +473,7 @@ root:
                 constant: http://10.5.110.131:28080/LA.zip
             pvc_path:
               runtimeValue:
-                constant: /mnt
+                constant: /tmp
         taskInfo:
           name: download-data
       evaluate-model:
@@ -463,8 +493,7 @@ root:
         taskInfo:
           name: evaluate-model
       preprocess-data:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-preprocess-data
         dependentTasks:
@@ -497,8 +526,7 @@ root:
         taskInfo:
           name: serving-comp
       train-model:
-        cachingOptions:
-          enableCache: true
+        cachingOptions: {}
         componentRef:
           name: comp-train-model
         dependentTasks:
@@ -524,7 +552,7 @@ platforms:
       executors:
         exec-download-data:
           pvcMount:
-          - mountPath: /mnt
+          - mountPath: /tmp
             pvcNameParameter:
               taskOutputParameter:
                 outputParameterKey: name
@@ -534,7 +562,7 @@ platforms:
               producerTask: createpvc
         exec-evaluate-model:
           pvcMount:
-          - mountPath: /mnt
+          - mountPath: /tmp
             pvcNameParameter:
               taskOutputParameter:
                 outputParameterKey: name
@@ -544,7 +572,7 @@ platforms:
               producerTask: createpvc
         exec-preprocess-data:
           pvcMount:
-          - mountPath: /mnt
+          - mountPath: /tmp
             pvcNameParameter:
               taskOutputParameter:
                 outputParameterKey: name
@@ -552,9 +580,20 @@ platforms:
             taskOutputParameter:
               outputParameterKey: name
               producerTask: createpvc
+        exec-serving-comp:
+          imagePullSecret:
+          - secretName: ghcr-secret
+            secretNameParameter:
+              runtimeValue:
+                constant: ghcr-secret
         exec-train-model:
+          imagePullSecret:
+          - secretName: ghcr-secret
+            secretNameParameter:
+              runtimeValue:
+                constant: ghcr-secret
           pvcMount:
-          - mountPath: /mnt
+          - mountPath: /tmp
             pvcNameParameter:
               taskOutputParameter:
                 outputParameterKey: name

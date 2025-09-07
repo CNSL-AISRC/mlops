@@ -11,7 +11,7 @@ load_dotenv()
     ],
 )
 def serving_comp(model_uri: str, isvc_name: str) -> str:
-    from kubernetes.client import V1ObjectMeta
+    from kubernetes.client import V1ObjectMeta, V1LocalObjectReference
     from kserve import (
         constants,
         KServeClient,
@@ -71,8 +71,10 @@ def serving_comp(model_uri: str, isvc_name: str) -> str:
                                 "nvidia.com/gpu": "1"
                             }
                         }
-                    }
-                }]
+                    },
+                }],
+                image_pull_secrets=[V1LocalObjectReference(name=os.getenv("IMAGE_PULL_SECRET_NAME"))],
+                restart_policy="Always"
             )
         )
     )

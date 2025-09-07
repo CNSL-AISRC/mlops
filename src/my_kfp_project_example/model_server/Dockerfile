@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir \
     boto3==1.37.1 \
     python-dotenv
 
+# Copy the models directory first (needed for MLflow model loading)
+COPY models/ /app/models/
+
 # Copy the model server script
 COPY model_server.py /app/model_server.py
 
